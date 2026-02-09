@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ally-patterns": {
+      "type": "local",
+      "command": "node",
+      "tools": ["*"],
+      "args": ["./mcp-server/dist/index.js"],
+      "env": {}
+    }
+  }
+}

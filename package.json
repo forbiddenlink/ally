@@ -1,0 +1,59 @@
+{
+  "name": "ally-a11y",
+  "version": "1.0.0",
+  "description": "Your codebase's accessibility ally. Scans, explains, and fixes a11y issues using GitHub Copilot CLI.",
+  "type": "module",
+  "bin": {
+    "ally": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "mcp-server/dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:all": "npm run build && cd mcp-server && npm run build",
+    "dev": "tsc -w",
+    "start": "node dist/cli.js",
+    "test": "node --test --experimental-strip-types test/**/*.test.ts",
+    "prepublishOnly": "npm run build:all"
+  },
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "wcag",
+    "axe-core",
+    "cli",
+    "github-copilot",
+    "mcp",
+    "copilot-cli"
+  ],
+  "author": "Liz Fong-Jones",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lizthegrey/ally.git"
+  },
+  "homepage": "https://github.com/lizthegrey/ally#readme",
+  "bugs": {
+    "url": "https://github.com/lizthegrey/ally/issues"
+  },
+  "dependencies": {
+    "@axe-core/puppeteer": "^4.10.0",
+    "axe-core": "^4.10.0",
+    "boxen": "^8.0.1",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "glob": "^11.0.1",
+    "ora": "^8.1.1",
+    "puppeteer": "^24.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
