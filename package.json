@@ -16,7 +16,7 @@
     "build:all": "npm run build && cd mcp-server && npm run build",
     "dev": "tsc -w",
     "start": "node dist/cli.js",
-    "test": "node --test --import tsx test/**/*.test.ts",
+    "test": "node --test --import tsx test/*.test.ts",
     "prepublishOnly": "npm run build:all"
   },
   "keywords": [
