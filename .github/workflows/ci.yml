@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*'
   pull_request:
     branches: [main]
 
@@ -46,7 +48,7 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - uses: actions/checkout@v4
@@ -66,17 +68,7 @@ jobs:
       - name: Build
         run: npm run build:all
 
-      - name: Check if version changed
-        id: version
-        run: |
-          CURRENT=$(npm view ally-a11y version 2>/dev/null || echo "0.0.0")
-          NEW=$(node -p "require('./package.json').version")
-          if [ "$CURRENT" != "$NEW" ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Publish to npm
-        if: steps.version.outputs.changed == 'true'
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
