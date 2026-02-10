@@ -16,7 +16,7 @@
     "build:all": "npm run build && cd mcp-server && npm run build",
     "dev": "tsc -w",
     "start": "node dist/cli.js",
-    "test": "node --test --experimental-strip-types test/**/*.test.ts",
+    "test": "node --test --import tsx test/**/*.test.ts",
     "prepublishOnly": "npm run build:all"
   },
   "keywords": [
@@ -55,6 +55,7 @@
     "@types/cli-progress": "^3.11.6",
     "@types/inquirer": "^9.0.9",
     "@types/node": "^22.13.4",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3"
   },
   "engines": {
