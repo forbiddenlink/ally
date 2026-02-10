@@ -13,6 +13,7 @@ import {
   printInfo,
   printWarning,
 } from '../utils/ui.js';
+import { suggestInit, suggestRescan } from '../utils/errors.js';
 import type { AllyReport, Violation, Severity } from '../types/index.js';
 
 interface ExplainOptions {
@@ -33,9 +34,8 @@ export async function explainCommand(options: ExplainOptions = {}): Promise<void
   const reportPath = resolve(input);
 
   if (!existsSync(reportPath)) {
-    spinner.fail('No scan results found');
-    printError(`Run 'ally scan' first to generate accessibility report`);
-    printInfo(`Expected report at: ${reportPath}`);
+    spinner.stop();
+    suggestInit(reportPath);
     return;
   }
 
@@ -46,7 +46,11 @@ export async function explainCommand(options: ExplainOptions = {}): Promise<void
     spinner.succeed(`Loaded ${report.summary.totalViolations} violations from scan`);
   } catch (error) {
     spinner.fail('Failed to load scan results');
-    printError(error instanceof Error ? error.message : String(error));
+    if (error instanceof SyntaxError) {
+      suggestRescan(reportPath);
+    } else {
+      printError(error instanceof Error ? error.message : String(error));
+    }
     return;
   }
 

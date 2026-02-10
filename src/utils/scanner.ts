@@ -12,6 +12,81 @@ import type { ScanResult, Violation, Severity, AllyReport, ReportSummary } from 
 const SUPPORTED_EXTENSIONS = ['.html', '.htm'];
 const COMPONENT_EXTENSIONS = ['.jsx', '.tsx', '.vue', '.svelte'];
 
+// WCAG standard types
+export type WcagStandard =
+  | 'wcag2a'
+  | 'wcag2aa'
+  | 'wcag2aaa'
+  | 'wcag21a'
+  | 'wcag21aa'
+  | 'wcag21aaa'
+  | 'wcag22aa'
+  | 'section508'
+  | 'best-practice';
+
+// Map standard names to axe-core tags
+export const standardToTags: Record<WcagStandard, string[]> = {
+  'wcag2a': ['wcag2a'],
+  'wcag2aa': ['wcag2a', 'wcag2aa'],
+  'wcag2aaa': ['wcag2a', 'wcag2aa', 'wcag2aaa'],
+  'wcag21a': ['wcag2a', 'wcag21a'],
+  'wcag21aa': ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+  'wcag21aaa': ['wcag2a', 'wcag2aa', 'wcag2aaa', 'wcag21a', 'wcag21aa', 'wcag21aaa'],
+  'wcag22aa': ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+  'section508': ['section508'],
+  'best-practice': ['best-practice'],
+};
+
+// Default standard
+export const DEFAULT_STANDARD: WcagStandard = 'wcag22aa';
+
+// Color blindness simulation types
+export type ColorBlindnessType = 'protanopia' | 'deuteranopia' | 'tritanopia';
+
+// SVG filter matrices for color blindness simulation
+// These use feColorMatrix values adapted for CSS filter
+const COLOR_BLINDNESS_FILTERS: Record<ColorBlindnessType, string> = {
+  // Protanopia (red-blind)
+  protanopia: `
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <filter id="protanopia">
+        <feColorMatrix type="matrix" values="
+          0.567 0.433 0     0 0
+          0.558 0.442 0     0 0
+          0     0.242 0.758 0 0
+          0     0     0     1 0
+        "/>
+      </filter>
+    </svg>
+  `,
+  // Deuteranopia (green-blind)
+  deuteranopia: `
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <filter id="deuteranopia">
+        <feColorMatrix type="matrix" values="
+          0.625 0.375 0   0 0
+          0.7   0.3   0   0 0
+          0     0.3   0.7 0 0
+          0     0     0   1 0
+        "/>
+      </filter>
+    </svg>
+  `,
+  // Tritanopia (blue-blind)
+  tritanopia: `
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <filter id="tritanopia">
+        <feColorMatrix type="matrix" values="
+          0.95 0.05  0     0 0
+          0    0.433 0.567 0 0
+          0    0.475 0.525 0 0
+          0    0     0     1 0
+        "/>
+      </filter>
+    </svg>
+  `,
+};
+
 export class AccessibilityScanner {
   private browser: Browser | null = null;
 
@@ -29,7 +104,7 @@ export class AccessibilityScanner {
     }
   }
 
-  async scanHtmlFile(filePath: string): Promise<ScanResult> {
+  async scanHtmlFile(filePath: string, standard: WcagStandard = DEFAULT_STANDARD): Promise<ScanResult> {
     if (!this.browser) {
       throw new Error('Scanner not initialized. Call init() first.');
     }
@@ -45,8 +120,9 @@ export class AccessibilityScanner {
       // Wait for page to be ready
       await page.waitForSelector('body');
 
+      const tags = standardToTags[standard];
       const results = await new AxePuppeteer(page)
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice'])
+        .withTags(tags)
         .analyze();
 
       const violations: Violation[] = results.violations.map((v) => ({
@@ -76,7 +152,7 @@ export class AccessibilityScanner {
     }
   }
 
-  async scanUrl(url: string): Promise<ScanResult> {
+  async scanUrl(url: string, standard: WcagStandard = DEFAULT_STANDARD): Promise<ScanResult> {
     if (!this.browser) {
       throw new Error('Scanner not initialized. Call init() first.');
     }
@@ -86,8 +162,9 @@ export class AccessibilityScanner {
     try {
       await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
 
+      const tags = standardToTags[standard];
       const results = await new AxePuppeteer(page)
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice'])
+        .withTags(tags)
         .analyze();
 
       const violations: Violation[] = results.violations.map((v) => ({
@@ -116,7 +193,7 @@ export class AccessibilityScanner {
     }
   }
 
-  async scanHtmlString(html: string, identifier: string = 'inline'): Promise<ScanResult> {
+  async scanHtmlString(html: string, identifier: string = 'inline', standard: WcagStandard = DEFAULT_STANDARD): Promise<ScanResult> {
     if (!this.browser) {
       throw new Error('Scanner not initialized. Call init() first.');
     }
@@ -126,8 +203,9 @@ export class AccessibilityScanner {
     try {
       await page.setContent(html, { waitUntil: 'domcontentloaded' });
 
+      const tags = standardToTags[standard];
       const results = await new AxePuppeteer(page)
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice'])
+        .withTags(tags)
         .analyze();
 
       const violations: Violation[] = results.violations.map((v) => ({
@@ -152,6 +230,63 @@ export class AccessibilityScanner {
         passes: results.passes.length,
         incomplete: results.incomplete.length,
       };
+    } finally {
+      await page.close();
+    }
+  }
+
+  /**
+   * Take a screenshot of a URL with color blindness simulation applied
+   */
+  async simulateColorBlindness(
+    url: string,
+    type: ColorBlindnessType,
+    outputPath: string
+  ): Promise<void> {
+    if (!this.browser) {
+      throw new Error('Scanner not initialized. Call init() first.');
+    }
+
+    const page = await this.browser.newPage();
+
+    try {
+      // Set a reasonable viewport size
+      await page.setViewport({ width: 1280, height: 800 });
+
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+      // Get the SVG filter for the specified color blindness type
+      const svgFilter = COLOR_BLINDNESS_FILTERS[type];
+
+      // Inject the SVG filter and apply it to the entire page
+      await page.addStyleTag({
+        content: `
+          /* Inject SVG filter as data URI */
+          html::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            background-image: url('data:image/svg+xml,${encodeURIComponent(svgFilter.trim())}');
+          }
+
+          /* Apply filter to the entire page */
+          html {
+            filter: url('data:image/svg+xml,${encodeURIComponent(svgFilter.trim())}#${type}');
+          }
+        `,
+      });
+
+      // Give the filter a moment to apply
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Take screenshot
+      await page.screenshot({
+        path: outputPath,
+        fullPage: true,
+      });
     } finally {
       await page.close();
     }

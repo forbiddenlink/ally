@@ -4,7 +4,7 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname, basename } from 'path';
 import chalk from 'chalk';
 import {
   printBanner,
@@ -13,12 +13,16 @@ import {
   printInfo,
   printSuccess,
 } from '../utils/ui.js';
+import { suggestInit, suggestRescan } from '../utils/errors.js';
+import { convertToSarif, convertToJunit, convertToCsv } from '../utils/converters.js';
 import type { AllyReport, Severity } from '../types/index.js';
+
+type ReportFormat = 'markdown' | 'html' | 'json' | 'sarif' | 'junit' | 'csv' | 'all';
 
 interface ReportOptions {
   input?: string;
   output?: string;
-  format?: 'markdown' | 'json' | 'html';
+  format?: ReportFormat;
 }
 
 export async function reportCommand(options: ReportOptions = {}): Promise<void> {
@@ -37,8 +41,8 @@ export async function reportCommand(options: ReportOptions = {}): Promise<void> 
   const reportPath = resolve(input);
 
   if (!existsSync(reportPath)) {
-    spinner.fail('No scan results found');
-    printError(`Run 'ally scan' first to generate accessibility report`);
+    spinner.stop();
+    suggestInit(reportPath);
     return;
   }
 
@@ -49,7 +53,11 @@ export async function reportCommand(options: ReportOptions = {}): Promise<void> 
     spinner.succeed('Loaded scan results');
   } catch (error) {
     spinner.fail('Failed to load scan results');
-    printError(error instanceof Error ? error.message : String(error));
+    if (error instanceof SyntaxError) {
+      suggestRescan(reportPath);
+    } else {
+      printError(error instanceof Error ? error.message : String(error));
+    }
     return;
   }
 
@@ -57,34 +65,92 @@ export async function reportCommand(options: ReportOptions = {}): Promise<void> 
   const generateSpinner = createSpinner('Generating report...');
   generateSpinner.start();
 
-  let reportContent: string;
+  // Handle batch export (--format all)
+  if (format === 'all') {
+    const outputDir = dirname(resolve(output));
+    const generatedFiles: string[] = [];
 
-  switch (format) {
-    case 'json':
-      reportContent = JSON.stringify(report, null, 2);
-      break;
-    case 'html':
-      reportContent = generateHtmlReport(report);
-      break;
-    case 'markdown':
-    default:
-      reportContent = generateMarkdownReport(report);
+    try {
+      // Generate all formats
+      const formats: Array<{ name: string; ext: string; content: string }> = [
+        { name: 'ACCESSIBILITY.md', ext: 'md', content: generateMarkdownReport(report) },
+        { name: 'accessibility.html', ext: 'html', content: generateHtmlReport(report) },
+        { name: 'accessibility.json', ext: 'json', content: JSON.stringify(report, null, 2) },
+        { name: 'accessibility.sarif', ext: 'sarif', content: JSON.stringify(convertToSarif(report), null, 2) },
+        { name: 'accessibility.junit.xml', ext: 'xml', content: convertToJunit(report) },
+        { name: 'accessibility.csv', ext: 'csv', content: convertToCsv(report) },
+      ];
+
+      for (const { name, content } of formats) {
+        const filePath = resolve(outputDir, name);
+        await writeFile(filePath, content);
+        generatedFiles.push(name);
+      }
+
+      generateSpinner.succeed('Generated all report formats');
+
+      console.log();
+      console.log(chalk.green(`\u2713 Generated ${generatedFiles.length} report files:`));
+      for (const file of generatedFiles) {
+        console.log(chalk.dim(`  \u2022 ${file}`));
+      }
+    } catch (error) {
+      generateSpinner.fail('Failed to write reports');
+      printError(error instanceof Error ? error.message : String(error));
+      return;
+    }
+  } else {
+    // Single format export
+    let reportContent: string;
+
+    switch (format) {
+      case 'json':
+        reportContent = JSON.stringify(report, null, 2);
+        break;
+      case 'html':
+        reportContent = generateHtmlReport(report);
+        break;
+      case 'sarif':
+        reportContent = JSON.stringify(convertToSarif(report), null, 2);
+        break;
+      case 'junit':
+        reportContent = convertToJunit(report);
+        break;
+      case 'csv':
+        reportContent = convertToCsv(report);
+        break;
+      case 'markdown':
+      default:
+        reportContent = generateMarkdownReport(report);
+    }
+
+    // Adjust output filename based on format
+    let outputPath = resolve(output);
+    if (format === 'sarif' && !output.endsWith('.sarif')) {
+      outputPath = resolve(dirname(output), 'accessibility.sarif');
+    } else if (format === 'junit' && !output.endsWith('.xml')) {
+      outputPath = resolve(dirname(output), 'accessibility.junit.xml');
+    } else if (format === 'csv' && !output.endsWith('.csv')) {
+      outputPath = resolve(dirname(output), 'accessibility.csv');
+    } else if (format === 'json' && !output.endsWith('.json')) {
+      outputPath = resolve(dirname(output), 'accessibility.json');
+    } else if (format === 'html' && !output.endsWith('.html')) {
+      outputPath = resolve(dirname(output), 'accessibility.html');
+    }
+
+    try {
+      await writeFile(outputPath, reportContent);
+      generateSpinner.succeed(`Report generated: ${outputPath}`);
+    } catch (error) {
+      generateSpinner.fail('Failed to write report');
+      printError(error instanceof Error ? error.message : String(error));
+      return;
+    }
+
+    console.log();
+    printSuccess('Accessibility report ready!');
+    printInfo(`Add ${basename(outputPath)} to your repository to document your a11y compliance`);
   }
-
-  // Write report
-  const outputPath = resolve(output);
-  try {
-    await writeFile(outputPath, reportContent);
-    generateSpinner.succeed(`Report generated: ${outputPath}`);
-  } catch (error) {
-    generateSpinner.fail('Failed to write report');
-    printError(error instanceof Error ? error.message : String(error));
-    return;
-  }
-
-  console.log();
-  printSuccess('Accessibility report ready!');
-  printInfo(`Add ${output} to your repository to document your a11y compliance`);
 
   // Generate badge URL
   const badgeColor = report.summary.score >= 90 ? 'brightgreen'
