@@ -13,6 +13,71 @@ if (noColor) {
   chalk.level = 0;
 }
 
+/**
+ * Check if terminal hyperlinks should be disabled
+ * Disabled in NO_COLOR mode, CI environments, or non-TTY
+ */
+function supportsHyperlinks(): boolean {
+  if (noColor) return false;
+  if (process.env.CI) return false;
+  if (!process.stdout.isTTY) return false;
+  // Some terminals advertise hyperlink support
+  if (process.env.TERM_PROGRAM === 'vscode') return true;
+  if (process.env.TERM_PROGRAM === 'iTerm.app') return true;
+  if (process.env.WT_SESSION) return true; // Windows Terminal
+  if (process.env.KONSOLE_VERSION) return true;
+  // Default to true for modern terminals
+  return true;
+}
+
+/**
+ * Create a terminal hyperlink using OSC 8 escape sequences
+ * Format: \x1b]8;;URL\x07TEXT\x1b]8;;\x07
+ *
+ * For VS Code and other editors, use file:// URLs with line and column:
+ * file://path/to/file:line:column
+ *
+ * @param text - The visible text to display
+ * @param url - The URL to link to
+ * @returns The text wrapped in hyperlink escape sequences, or plain text if unsupported
+ */
+export function hyperlink(text: string, url: string): string {
+  if (!supportsHyperlinks()) {
+    return text;
+  }
+  return `\x1b]8;;${url}\x07${text}\x1b]8;;\x07`;
+}
+
+/**
+ * Create a clickable file path link that opens in the editor
+ *
+ * @param filePath - Absolute or relative path to the file
+ * @param line - Optional line number (1-indexed)
+ * @param column - Optional column number (1-indexed)
+ * @returns Hyperlinked file path or plain text if unsupported
+ */
+export function fileLink(filePath: string, line?: number, column?: number): string {
+  // Build the file URL with optional line and column
+  let url = `file://${filePath}`;
+  if (line !== undefined) {
+    url += `:${line}`;
+    if (column !== undefined) {
+      url += `:${column}`;
+    }
+  }
+
+  // Build the display text
+  let displayText = filePath;
+  if (line !== undefined) {
+    displayText += `:${line}`;
+    if (column !== undefined) {
+      displayText += `:${column}`;
+    }
+  }
+
+  return hyperlink(displayText, url);
+}
+
 // Severity colors
 const severityColors: Record<Severity, (text: string) => string> = {
   critical: chalk.red.bold,
@@ -48,7 +113,7 @@ export function createSpinner(text: string): Ora {
   });
 }
 
-export function printViolation(violation: Violation, file?: string): void {
+export function printViolation(violation: Violation, file?: string, absolutePath?: string): void {
   const color = severityColors[violation.impact];
   const icon = severityIcons[violation.impact];
 
@@ -56,7 +121,11 @@ export function printViolation(violation: Violation, file?: string): void {
   console.log(chalk.white(`      ${violation.help}`));
 
   if (file) {
-    console.log(chalk.dim(`      File: ${file}`));
+    // Use absolute path for the hyperlink if available, display relative path
+    const linkPath = absolutePath || file;
+    const linkedFile = fileLink(linkPath);
+    // Apply dim styling to the linked text
+    console.log(chalk.dim(`      File: `) + chalk.dim(linkedFile));
   }
 
   violation.nodes.forEach((node, i) => {
@@ -70,7 +139,9 @@ export function printViolation(violation: Violation, file?: string): void {
     console.log(chalk.dim(`      ... and ${violation.nodes.length - 3} more occurrences`));
   }
 
-  console.log(chalk.dim(`      Learn more: ${violation.helpUrl}`));
+  // Make the help URL clickable too
+  const helpLink = hyperlink(violation.helpUrl, violation.helpUrl);
+  console.log(chalk.dim(`      Learn more: `) + chalk.dim(helpLink));
   console.log();
 }
 
@@ -215,9 +286,12 @@ export function printScoreBadge(score: number): void {
   );
 }
 
-export function printFileHeader(file: string, violationCount: number): void {
+export function printFileHeader(file: string, violationCount: number, absolutePath?: string): void {
   const color = violationCount > 0 ? chalk.yellow : chalk.green;
-  console.log(color.bold(`\n📄 ${file}`));
+  // Use absolute path for the hyperlink if available
+  const linkPath = absolutePath || file;
+  const linkedFile = fileLink(linkPath);
+  console.log(color.bold(`\n📄 `) + color.bold(linkedFile));
   if (violationCount > 0) {
     console.log(chalk.dim(`   ${violationCount} issue${violationCount === 1 ? '' : 's'} found`));
   } else {

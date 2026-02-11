@@ -17,6 +17,7 @@ import {
   printSuccess,
   printWarning,
   printScoreChange,
+  fileLink,
 } from '../utils/ui.js';
 import {
   checkCopilotCli,
@@ -26,7 +27,7 @@ import {
   checkMcpConfig,
 } from '../utils/copilot.js';
 import { suggestInit, suggestRescan } from '../utils/errors.js';
-import { generateSuggestedFix } from '../utils/fix-patterns.js';
+import { generateSuggestedFix, getFixConfidence, getConfidenceLevel } from '../utils/fix-patterns.js';
 import type { AllyReport, Violation, Severity, FixResult } from '../types/index.js';
 
 // Track if we've shown Copilot instructions
@@ -43,6 +44,25 @@ interface FixHistoryEntry {
 }
 
 const MAX_FIX_HISTORY_ENTRIES = 100;
+
+/**
+ * Format confidence score for display with color coding
+ * @param confidence - Confidence score between 0 and 1
+ * @returns Formatted string with color (green=high, yellow=medium, red=low)
+ */
+function formatConfidence(confidence: number): string {
+  const percentage = Math.round(confidence * 100);
+  const level = getConfidenceLevel(confidence);
+
+  switch (level) {
+    case 'high':
+      return chalk.green(`${percentage}% confidence`);
+    case 'medium':
+      return chalk.yellow(`${percentage}% confidence`);
+    case 'low':
+      return chalk.red(`${percentage}% confidence`);
+  }
+}
 
 /**
  * Save a fix to the history file
@@ -149,7 +169,8 @@ export async function fixCommand(options: FixOptions = {}): Promise<void> {
 
   // Process each file
   for (const { file, violations } of fileViolations) {
-    console.log(chalk.bold(`\n📄 ${file}`));
+    const linkedFile = fileLink(file);
+    console.log(chalk.bold(`\n📄 `) + chalk.bold(linkedFile));
     console.log(chalk.dim(`   ${violations.length} issue${violations.length === 1 ? '' : 's'} to fix`));
 
     for (const violation of violations) {
@@ -258,6 +279,9 @@ async function processViolation(
     // Generate suggested fix
     const suggestedFix = generateSuggestedFix(violation, node.html);
     if (suggestedFix) {
+      const confidence = getFixConfidence(violation.id);
+      const confidenceStr = confidence !== null ? ` (${formatConfidence(confidence)})` : '';
+      console.log(chalk.cyan(`   Suggested fix${confidenceStr}:`));
       console.log(chalk.green(`   + ${truncate(suggestedFix, 80)}`));
     }
   }

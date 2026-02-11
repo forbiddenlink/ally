@@ -375,12 +375,13 @@ async function scanFiles(
       if (!result.file) continue;
 
       const relPath = relative(absolutePath, result.file);
-      printFileHeader(relPath, result.violations.length);
+      // Pass absolute path for clickable hyperlinks
+      printFileHeader(relPath, result.violations.length, result.file);
 
       if (result.violations.length > 0) {
         for (const violation of result.violations) {
           if (verbose || violation.impact === 'critical' || violation.impact === 'serious') {
-            printViolation(violation, relPath);
+            printViolation(violation, relPath, result.file);
           }
         }
       }

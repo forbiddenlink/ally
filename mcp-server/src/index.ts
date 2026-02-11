@@ -13,6 +13,7 @@ import { z } from "zod";
 import { readFile, readdir, stat } from "fs/promises";
 import { join, extname } from "path";
 import { existsSync } from "fs";
+import { APCAcontrast, sRGBtoY } from "apca-w3";
 
 // Create server instance
 const server = new McpServer({
@@ -1478,7 +1479,7 @@ ${pattern.codeExample}
 // Tool: Check color contrast
 server.tool(
   "check_color_contrast",
-  "Calculate WCAG contrast ratio between two colors and check compliance",
+  "Calculate WCAG contrast ratio and APCA Lc value between two colors and check compliance",
   {
     foreground: z.string().describe("Foreground color (hex, rgb, or named)"),
     background: z.string().describe("Background color (hex, rgb, or named)"),
@@ -1515,14 +1516,33 @@ server.tool(
         };
       }
 
-      // Calculate contrast ratio
+      // Calculate WCAG 2.x contrast ratio
       const contrastRatio = calculateContrastRatio(fgColor, bgColor);
       const roundedRatio = Math.round(contrastRatio * 100) / 100;
+
+      // Calculate APCA Lc value (Advanced Perceptual Contrast Algorithm)
+      const fgArray: [number, number, number] = [fgColor.r, fgColor.g, fgColor.b];
+      const bgArray: [number, number, number] = [bgColor.r, bgColor.g, bgColor.b];
+      const apcaLc = APCAcontrast(sRGBtoY(fgArray), sRGBtoY(bgArray)) as number;
+      const roundedLc = Math.round(apcaLc * 10) / 10;
+      const absLc = Math.abs(roundedLc);
+
+      // APCA thresholds (based on WCAG 3.0 draft guidelines)
+      // Lc 90+ : Preferred for body text
+      // Lc 75+ : Minimum for body text
+      // Lc 60+ : Large text and headlines
+      // Lc 45+ : Non-text elements, graphics
+      const apcaCompliance = {
+        bodyTextPreferred: absLc >= 90,
+        bodyTextMinimum: absLc >= 75,
+        largeText: absLc >= 60,
+        nonText: absLc >= 45,
+      };
 
       // Determine if text is large
       const largeText = isLargeText(fontSize, isBold);
 
-      // WCAG thresholds
+      // WCAG 2.x thresholds
       // AA: 4.5:1 for normal text, 3:1 for large text
       // AAA: 7:1 for normal text, 4.5:1 for large text
       const wcagAA = {
@@ -1560,13 +1580,14 @@ server.tool(
       // Build result object
       const result = {
         contrastRatio: roundedRatio,
+        apcaLc: roundedLc,
         wcagAA,
         wcagAAA,
+        apcaCompliance,
         recommendation,
       };
 
       // Format response
-      const textSizeInfo = fontSize ? ` (${fontSize}px${isBold ? " bold" : ""})` : "";
       const passStatus = passesAA
         ? passesAAA
           ? "PASS (AAA)"
@@ -1574,6 +1595,20 @@ server.tool(
         : wcagAA.largeText
         ? "PARTIAL (large text only)"
         : "FAIL";
+
+      // APCA status string
+      let apcaStatus = "";
+      if (apcaCompliance.bodyTextPreferred) {
+        apcaStatus = "Preferred for body text";
+      } else if (apcaCompliance.bodyTextMinimum) {
+        apcaStatus = "Minimum for body text";
+      } else if (apcaCompliance.largeText) {
+        apcaStatus = "Large text/headlines only";
+      } else if (apcaCompliance.nonText) {
+        apcaStatus = "Non-text elements only";
+      } else {
+        apcaStatus = "Insufficient";
+      }
 
       const response = `# Color Contrast Check
 
@@ -1583,13 +1618,24 @@ ${fontSize ? `**Text size:** ${fontSize}px${isBold ? " (bold)" : ""}` : ""}
 
 ## Result: ${passStatus}
 
-**Contrast Ratio:** ${roundedRatio}:1
+**WCAG 2.x Contrast Ratio:** ${roundedRatio}:1
+**APCA Lc Value:** ${roundedLc} (${apcaStatus})
 
-### WCAG Compliance
+### WCAG 2.x Compliance
 | Level | Normal Text (< 18pt) | Large Text (≥ 18pt) |
 |-------|---------------------|---------------------|
 | AA    | ${wcagAA.normalText ? "✓ Pass (≥ 4.5:1)" : "✗ Fail (< 4.5:1)"} | ${wcagAA.largeText ? "✓ Pass (≥ 3:1)" : "✗ Fail (< 3:1)"} |
 | AAA   | ${wcagAAA.normalText ? "✓ Pass (≥ 7:1)" : "✗ Fail (< 7:1)"} | ${wcagAAA.largeText ? "✓ Pass (≥ 4.5:1)" : "✗ Fail (< 4.5:1)"} |
+
+### APCA Compliance (Experimental - WCAG 3.0 Draft)
+| Use Case | Threshold | Status |
+|----------|-----------|--------|
+| Body text (preferred) | Lc ≥ 90 | ${apcaCompliance.bodyTextPreferred ? "✓ Pass" : "✗ Fail"} |
+| Body text (minimum) | Lc ≥ 75 | ${apcaCompliance.bodyTextMinimum ? "✓ Pass" : "✗ Fail"} |
+| Large text/headlines | Lc ≥ 60 | ${apcaCompliance.largeText ? "✓ Pass" : "✗ Fail"} |
+| Non-text elements | Lc ≥ 45 | ${apcaCompliance.nonText ? "✓ Pass" : "✗ Fail"} |
+
+*Note: APCA uses signed values. Negative Lc indicates light text on dark background.*
 
 ## Recommendation
 ${recommendation}

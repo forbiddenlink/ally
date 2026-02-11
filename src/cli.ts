@@ -61,6 +61,7 @@ program
     return value;
   })
   .option('-T, --timeout <ms>', 'Page load timeout in milliseconds (default: 30000)')
+  .option('--experimental-apca', 'Show APCA Lc values alongside WCAG 2.x contrast ratios (experimental)')
   .action(async (path: string | undefined, options) => {
     try {
       // Parse timeout if provided

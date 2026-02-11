@@ -68,6 +68,104 @@ export function inferDescription(html: string, fallback: string): string {
 export type FixPatternFn = (html: string, violation: Violation) => string | null;
 
 /**
+ * Confidence scores for each fix pattern (0.0 to 1.0)
+ *
+ * High confidence (0.9+): Simple attribute additions (alt, aria-label, lang)
+ * Medium confidence (0.7-0.9): Structural changes, role assignments
+ * Lower confidence (0.5-0.7): Complex fixes requiring context
+ */
+export const FIX_CONFIDENCE: Record<string, number> = {
+  // === IMAGE AND MEDIA ===
+  'image-alt': 0.95, // Simple, reliable - just adds alt attribute
+  'image-redundant-alt': 0.85, // Usually correct but may need human review
+
+  // === INTERACTIVE ELEMENTS ===
+  'button-name': 0.85, // Usually correct but may need human review
+  'link-name': 0.80, // Infers from href, may need adjustment
+  'input-button-name': 0.90, // Simple value addition
+  'aria-command-name': 0.75, // Role-based inference, needs context
+
+  // === FORM ELEMENTS ===
+  'label': 0.85, // Infers from name attribute
+  'select-name': 0.85, // Infers from name attribute
+  'autocomplete-valid': 0.80, // Map-based, may not match all cases
+  'form-field-multiple-labels': 0.50, // Just a comment, needs manual work
+
+  // === DOCUMENT STRUCTURE ===
+  'html-has-lang': 0.99, // Trivial fix, very reliable
+  'document-title': 0.90, // Simple addition but needs real title
+  'meta-viewport': 0.95, // Regex replacement is reliable
+
+  // === HEADING STRUCTURE ===
+  'heading-order': 0.65, // Suggests h2, but context-dependent
+  'empty-heading': 0.70, // Adds placeholder, needs real content
+
+  // === LANDMARKS ===
+  'landmark-one-main': 0.75, // Wrapping is correct but may affect layout
+  'region': 0.80, // Simple role addition
+  'bypass': 0.60, // Adds skip link template, needs integration
+
+  // === TABLES ===
+  'td-headers-attr': 0.70, // Adds placeholder, needs real header IDs
+  'th-has-data-cells': 0.85, // Scope addition is usually correct
+
+  // === ARIA ===
+  'aria-required-children': 0.65, // Complex, depends on content structure
+  'aria-required-parent': 0.70, // Wrapping may affect layout
+  'aria-hidden-focus': 0.90, // Tabindex fix is straightforward
+  'aria-valid-attr-value': 0.85, // Regex replacement is reliable
+
+  // === KEYBOARD NAVIGATION ===
+  'tabindex': 0.95, // Simple value change
+  'focus-visible': 0.55, // Just a CSS comment, needs manual work
+  'focus-order-semantics': 0.95, // Simple tabindex fix
+
+  // === LISTS ===
+  'list': 0.70, // Wrapping may affect layout
+  'listitem': 0.70, // Wrapping may affect layout
+
+  // === IFRAMES ===
+  'frame-title': 0.90, // Infers from src, usually good
+  'frame-focusable-content': 0.85, // Simple tabindex addition
+
+  // === COLOR AND CONTRAST ===
+  'color-contrast': 0.50, // Just a comment, needs manual work
+  'link-in-text-block': 0.80, // Adds underline style
+
+  // === IDS ===
+  'duplicate-id': 0.75, // Generates unique ID, but may break references
+  'duplicate-id-active': 0.75, // Same as above
+  'duplicate-id-aria': 0.75, // Same as above
+
+  // === SVG ===
+  'svg-img-alt': 0.85, // Adds role and aria-label
+
+  // === SCROLLABLE REGIONS ===
+  'scrollable-region-focusable': 0.90, // Simple tabindex addition
+
+  // === VIDEO/AUDIO ===
+  'video-caption': 0.60, // Adds template, needs real captions file
+  'audio-caption': 0.50, // Just a comment, needs transcript
+};
+
+/**
+ * Get confidence score for a fix pattern
+ * @returns Confidence score between 0 and 1, or null if pattern not found
+ */
+export function getFixConfidence(patternId: string): number | null {
+  return FIX_CONFIDENCE[patternId] ?? null;
+}
+
+/**
+ * Get confidence level category
+ */
+export function getConfidenceLevel(confidence: number): 'high' | 'medium' | 'low' {
+  if (confidence >= 0.9) return 'high';
+  if (confidence >= 0.7) return 'medium';
+  return 'low';
+}
+
+/**
  * Auto-fix patterns for common accessibility violations
  */
 export const FIX_PATTERNS: Record<string, FixPatternFn> = {
