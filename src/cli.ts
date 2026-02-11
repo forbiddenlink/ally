@@ -25,6 +25,7 @@ import { crawlCommand } from './commands/crawl.js';
 import { treeCommand } from './commands/tree.js';
 import { triageCommand } from './commands/triage.js';
 import { prCheckCommand } from './commands/pr-check.js';
+import { completionCommand } from './commands/completion.js';
 
 const program = new Command();
 
@@ -336,6 +337,19 @@ program
       });
     } catch (error) {
       console.error('PR check failed:', error);
+      process.exit(1);
+    }
+  });
+
+// ally completion
+program
+  .command('completion [shell]')
+  .description('Generate shell completion script (bash, zsh, fish)')
+  .action(async (shell: string | undefined) => {
+    try {
+      await completionCommand(shell);
+    } catch (error) {
+      console.error('Completion failed:', error);
       process.exit(1);
     }
   });
