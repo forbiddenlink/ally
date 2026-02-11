@@ -7,6 +7,11 @@
  */
 
 import { Command } from 'commander';
+import { createRequire } from 'module';
+
+// Read version from package.json to stay in sync
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
 import { scanCommand } from './commands/scan.js';
 import { explainCommand } from './commands/explain.js';
 import { fixCommand } from './commands/fix.js';
@@ -26,7 +31,7 @@ const program = new Command();
 program
   .name('ally')
   .description('Your codebase\'s accessibility ally. Scans, explains, and fixes a11y issues using GitHub Copilot CLI.')
-  .version('1.0.0');
+  .version(version);
 
 // ally scan [path]
 program
