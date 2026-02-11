@@ -18,6 +18,11 @@ import {
   standardToTags,
 } from '../utils/scanner.js';
 import {
+  getCachedResult,
+  cacheResult,
+  clearCache,
+} from '../utils/cache.js';
+import {
   printBanner,
   createSpinner,
   printViolation,
@@ -53,6 +58,7 @@ interface ScanCommandOptions {
   simulate?: ColorBlindnessType;
   standard?: WcagStandard;
   timeout?: number;
+  noCache?: boolean;
 }
 
 // SARIF 2.1.0 types
@@ -151,7 +157,8 @@ export async function scanCommand(
   }
 
   // File scanning mode
-  return await scanFiles(targetPath, mergedOutput, json, verbose, mergedFormat, mergedStandard, allIgnorePatterns, mergedTimeout);
+  const noCache = options.noCache ?? false;
+  return await scanFiles(targetPath, mergedOutput, json, verbose, mergedFormat, mergedStandard, allIgnorePatterns, mergedTimeout, noCache);
 }
 
 async function scanUrl(
@@ -251,7 +258,8 @@ async function scanFiles(
   format?: OutputFormat,
   standard: WcagStandard = DEFAULT_STANDARD,
   ignorePatterns: string[] = [],
-  timeout: number = DEFAULT_TIMEOUT
+  timeout: number = DEFAULT_TIMEOUT,
+  noCache: boolean = false
 ): Promise<AllyReport | null> {
   const absolutePath = resolve(targetPath);
 
@@ -279,6 +287,7 @@ async function scanFiles(
   const scanner = new AccessibilityScanner(timeout);
   const results: ScanResult[] = [];
   const errors: Array<{ path: string; error: string }> = [];
+  let skippedCount = 0;
 
   // Use progress bar for multi-file scanning, or simple text for NO_COLOR
   const useProgressBar = !isNoColor() && allFiles.length > 1;
@@ -313,8 +322,24 @@ async function scanFiles(
       }
 
       try {
+        // Check cache first (unless --no-cache is set)
+        if (!noCache) {
+          const cachedResult = await getCachedResult(file, standard);
+          if (cachedResult) {
+            results.push(cachedResult);
+            skippedCount++;
+            continue;
+          }
+        }
+
+        // Scan the file
         const result = await scanner.scanHtmlFile(file, standard);
         results.push(result);
+
+        // Cache the result
+        if (!noCache) {
+          await cacheResult(file, result, standard);
+        }
       } catch (error) {
         errors.push({ path: relPath, error: error instanceof Error ? error.message : String(error) });
       }
@@ -334,7 +359,12 @@ async function scanFiles(
     }
 
     console.log();
-    printSuccess(`Scanned ${results.length} files`);
+    const scannedCount = results.length - skippedCount;
+    if (skippedCount > 0) {
+      printSuccess(`Scanned ${scannedCount} files (${skippedCount} skipped, unchanged)`);
+    } else {
+      printSuccess(`Scanned ${results.length} files`);
+    }
 
     // Create report
     const report = createReport(results);

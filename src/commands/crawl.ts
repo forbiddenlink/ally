@@ -13,7 +13,9 @@ import {
   printSuccess,
   printError,
   printInfo,
+  printWarning,
 } from '../utils/ui.js';
+import { withRetry, isTransientError } from '../utils/retry.js';
 import chalk from 'chalk';
 import type { ScanResult, AllyReport } from '../types/index.js';
 
@@ -201,8 +203,21 @@ export async function crawlCommand(
       spinner.start();
 
       try {
-        // Scan the page for accessibility issues
-        const result = await scanner.scanUrl(normalized);
+        // Scan the page for accessibility issues with retry for transient errors
+        const result = await withRetry(
+          () => scanner.scanUrl(normalized),
+          {
+            maxRetries: 3,
+            baseDelayMs: 1000,
+            onRetry: (attempt, error, delayMs) => {
+              spinner.stop();
+              printWarning(
+                `Retry ${attempt}/3 for ${normalized} after ${delayMs / 1000}s (${error.message})`
+              );
+              spinner.start();
+            },
+          }
+        );
         results.push(result);
 
         // Calculate score for this single result
