@@ -27,7 +27,7 @@ import {
   checkMcpConfig,
 } from '../utils/copilot.js';
 import { suggestInit, suggestRescan } from '../utils/errors.js';
-import { generateSuggestedFix, getFixConfidence, getConfidenceLevel } from '../utils/fix-patterns.js';
+import { generateSuggestedFix, getFixConfidence, getConfidenceLevel, FIX_CONFIDENCE } from '../utils/fix-patterns.js';
 import type { AllyReport, Violation, Severity, FixResult } from '../types/index.js';
 
 // Track if we've shown Copilot instructions
@@ -42,6 +42,70 @@ interface FixHistoryEntry {
   afterSnippet: string;
   wcagCriteria: string[];
 }
+
+// WCAG criterion explanations for common violation IDs
+const WCAG_EXPLANATIONS: Record<string, { criterion: string; why: string }> = {
+  'button-name': {
+    criterion: '4.1.2 Name, Role, Value (Level A)',
+    why: 'Buttons must have discernible text for screen readers.',
+  },
+  'image-alt': {
+    criterion: '1.1.1 Non-text Content (Level A)',
+    why: 'Images must have alternative text for users who cannot see them.',
+  },
+  'link-name': {
+    criterion: '2.4.4 Link Purpose (In Context) (Level A)',
+    why: 'Links must have discernible text to indicate their destination.',
+  },
+  'label': {
+    criterion: '1.3.1 Info and Relationships (Level A)',
+    why: 'Form inputs must have labels so users know what to enter.',
+  },
+  'html-has-lang': {
+    criterion: '3.1.1 Language of Page (Level A)',
+    why: 'Screen readers need to know the page language to pronounce text correctly.',
+  },
+  'color-contrast': {
+    criterion: '1.4.3 Contrast (Minimum) (Level AA)',
+    why: 'Text must have sufficient contrast with its background to be readable.',
+  },
+  'heading-order': {
+    criterion: '1.3.1 Info and Relationships (Level A)',
+    why: 'Headings must be in logical order for document structure navigation.',
+  },
+  'aria-hidden-focus': {
+    criterion: '4.1.2 Name, Role, Value (Level A)',
+    why: 'Hidden elements should not be focusable by keyboard users.',
+  },
+  'frame-title': {
+    criterion: '2.4.1 Bypass Blocks (Level A)',
+    why: 'iframes need titles so users understand their content without loading them.',
+  },
+  'select-name': {
+    criterion: '1.3.1 Info and Relationships (Level A)',
+    why: 'Select elements must have accessible names for form navigation.',
+  },
+  'bypass': {
+    criterion: '2.4.1 Bypass Blocks (Level A)',
+    why: 'Users need a way to skip repetitive content like navigation.',
+  },
+  'landmark-one-main': {
+    criterion: '1.3.1 Info and Relationships (Level A)',
+    why: 'Pages need a main landmark so users can quickly find primary content.',
+  },
+  'meta-viewport': {
+    criterion: '1.4.4 Resize Text (Level AA)',
+    why: 'Users must be able to zoom and resize text for readability.',
+  },
+  'document-title': {
+    criterion: '2.4.2 Page Titled (Level A)',
+    why: 'Pages need titles so users can identify them in tabs and history.',
+  },
+  'duplicate-id': {
+    criterion: '4.1.1 Parsing (Level A)',
+    why: 'Duplicate IDs cause assistive technologies to behave unpredictably.',
+  },
+};
 
 const MAX_FIX_HISTORY_ENTRIES = 100;
 
@@ -105,6 +169,17 @@ interface FixOptions {
   severity?: Severity;
   auto?: boolean;
   dryRun?: boolean;
+  yes?: boolean;
+}
+
+// Pending fix for interactive review
+interface PendingFix {
+  file: string;
+  violation: Violation;
+  beforeSnippet: string;
+  afterSnippet: string | null;
+  confidence: number | null;
+  wcagInfo: { criterion: string; why: string } | null;
 }
 
 interface FileViolation {
@@ -115,7 +190,7 @@ interface FileViolation {
 export async function fixCommand(options: FixOptions = {}): Promise<void> {
   printBanner();
 
-  const { input = '.ally/scan.json', severity, auto = false, dryRun = false } = options;
+  const { input = '.ally/scan.json', severity, auto = false, dryRun = false, yes = false } = options;
 
   // Load scan results
   const spinner = createSpinner('Loading scan results...');
@@ -157,30 +232,80 @@ export async function fixCommand(options: FixOptions = {}): Promise<void> {
   let fixedCount = 0;
   let skippedCount = 0;
 
-  console.log();
-  console.log(chalk.bold.cyan('Fixing Accessibility Issues'));
-  console.log(chalk.dim('━'.repeat(50)));
-  console.log();
+  // Interactive mode: --yes flag disables it
+  const interactive = !yes && !auto && !dryRun && process.stdout.isTTY;
 
-  if (dryRun) {
-    printWarning('Dry run mode - no changes will be made');
-    console.log();
-  }
+  if (interactive) {
+    // Collect all pending fixes for interactive review
+    const pendingFixes: PendingFix[] = [];
 
-  // Process each file
-  for (const { file, violations } of fileViolations) {
-    const linkedFile = fileLink(file);
-    console.log(chalk.bold(`\n📄 `) + chalk.bold(linkedFile));
-    console.log(chalk.dim(`   ${violations.length} issue${violations.length === 1 ? '' : 's'} to fix`));
+    for (const { file, violations } of fileViolations) {
+      for (const violation of violations) {
+        const node = violation.nodes[0];
+        const beforeSnippet = node?.html || '';
+        const afterSnippet = node ? generateSuggestedFix(violation, node.html) : null;
+        const confidence = getFixConfidence(violation.id);
+        const wcagInfo = WCAG_EXPLANATIONS[violation.id] || null;
 
-    for (const violation of violations) {
-      const result = await processViolation(file, violation, { auto, dryRun });
+        pendingFixes.push({
+          file,
+          violation,
+          beforeSnippet,
+          afterSnippet,
+          confidence,
+          wcagInfo,
+        });
+      }
+    }
+
+    // Run interactive review
+    const { accepted, skipped } = await runInteractiveReview(pendingFixes);
+
+    // Apply accepted fixes
+    for (const fix of accepted) {
+      const result = await applyFix(fix.file, fix.violation);
       fixResults.push(result);
+      if (result.fixed) fixedCount++;
+    }
 
-      if (result.fixed) {
-        fixedCount++;
-      } else if (result.skipped) {
-        skippedCount++;
+    // Record skipped fixes
+    for (const fix of skipped) {
+      fixResults.push({
+        file: fix.file,
+        line: 0,
+        violation: fix.violation.id,
+        fixed: false,
+        skipped: true,
+      });
+      skippedCount++;
+    }
+  } else {
+    // Non-interactive mode (original behavior)
+    console.log();
+    console.log(chalk.bold.cyan('Fixing Accessibility Issues'));
+    console.log(chalk.dim('━'.repeat(50)));
+    console.log();
+
+    if (dryRun) {
+      printWarning('Dry run mode - no changes will be made');
+      console.log();
+    }
+
+    // Process each file
+    for (const { file, violations } of fileViolations) {
+      const linkedFile = fileLink(file);
+      console.log(chalk.bold(`\n📄 `) + chalk.bold(linkedFile));
+      console.log(chalk.dim(`   ${violations.length} issue${violations.length === 1 ? '' : 's'} to fix`));
+
+      for (const violation of violations) {
+        const result = await processViolation(file, violation, { auto, dryRun });
+        fixResults.push(result);
+
+        if (result.fixed) {
+          fixedCount++;
+        } else if (result.skipped) {
+          skippedCount++;
+        }
       }
     }
   }
@@ -212,6 +337,268 @@ ${chalk.dim('Total:')} ${fixResults.length}
 
   console.log();
   printInfo('Run `ally scan` again to verify fixes and update your score');
+}
+
+/**
+ * Clear the terminal screen
+ */
+function clearScreen(): void {
+  process.stdout.write('\x1b[2J\x1b[H');
+}
+
+/**
+ * Format code snippet with syntax highlighting using chalk
+ */
+function formatCodeSnippet(code: string, isAddition: boolean = false): string {
+  const lines = code.split('\n');
+  const prefix = isAddition ? chalk.green('  + ') : chalk.red('  - ');
+  const color = isAddition ? chalk.green : chalk.red;
+
+  return lines.map((line) => prefix + color(line)).join('\n');
+}
+
+/**
+ * Display a single fix in interactive mode
+ */
+function displayInteractiveFix(fix: PendingFix, index: number, total: number): void {
+  clearScreen();
+
+  // Confidence display
+  const confidence = fix.confidence !== null ? Math.round(fix.confidence * 100) : null;
+  let confidenceStr = '';
+  if (confidence !== null) {
+    const level = getConfidenceLevel(fix.confidence!);
+    const color =
+      level === 'high' ? chalk.green : level === 'medium' ? chalk.yellow : chalk.red;
+    confidenceStr = color(`${confidence}% confidence`);
+  }
+
+  // Severity color
+  const severityColors: Record<Severity, (text: string) => string> = {
+    critical: chalk.red.bold,
+    serious: chalk.red,
+    moderate: chalk.yellow,
+    minor: chalk.blue,
+  };
+  const severityColor = severityColors[fix.violation.impact];
+
+  // Header box
+  const headerContent = [
+    `  ${chalk.bold(`Fix ${index + 1} of ${total}:`)} ${chalk.cyan(fix.violation.id)}${
+      confidenceStr ? ` (${confidenceStr})` : ''
+    }`,
+    `  ${chalk.dim('Severity:')} ${severityColor(fix.violation.impact.toUpperCase())}`,
+    `  ${chalk.dim('File:')} ${chalk.white(fix.file)}`,
+  ].join('\n');
+
+  console.log(
+    boxen(headerContent, {
+      padding: { top: 0, bottom: 0, left: 0, right: 1 },
+      borderStyle: 'round',
+      borderColor: 'cyan',
+    })
+  );
+
+  console.log();
+
+  // Issue description
+  console.log(chalk.bold.white(fix.violation.help));
+  console.log();
+
+  // Before/After comparison
+  if (fix.beforeSnippet) {
+    console.log(chalk.dim.underline('Before:'));
+    console.log(formatCodeSnippet(truncateCode(fix.beforeSnippet, 200), false));
+    console.log();
+  }
+
+  if (fix.afterSnippet) {
+    console.log(chalk.dim.underline('After:'));
+    console.log(formatCodeSnippet(truncateCode(fix.afterSnippet, 200), true));
+    console.log();
+  } else {
+    console.log(chalk.yellow('  (No automatic fix available - requires manual review)'));
+    console.log();
+  }
+
+  // WCAG explanation
+  if (fix.wcagInfo) {
+    console.log(chalk.dim.underline('Why:'));
+    console.log(chalk.white(`  ${fix.wcagInfo.why}`));
+    console.log(chalk.dim(`  WCAG: ${fix.wcagInfo.criterion}`));
+    console.log();
+  }
+
+  // Action prompt
+  console.log(
+    chalk.cyan(
+      '[y] Apply  [n] Skip  [a] Apply all remaining  [q] Quit  [?] More info'
+    )
+  );
+  process.stdout.write(chalk.cyan('> '));
+}
+
+/**
+ * Truncate code to a maximum length for display
+ */
+function truncateCode(code: string, maxLength: number): string {
+  const singleLine = code.replace(/\s+/g, ' ').trim();
+  if (singleLine.length <= maxLength) return singleLine;
+  return singleLine.slice(0, maxLength - 3) + '...';
+}
+
+/**
+ * Show detailed information about a fix
+ */
+function showFixDetails(fix: PendingFix): void {
+  console.log();
+  console.log(chalk.bold.cyan('━━━ Additional Information ━━━'));
+  console.log();
+
+  // Full violation details
+  console.log(chalk.bold('Description:'));
+  console.log(`  ${fix.violation.description}`);
+  console.log();
+
+  // Help URL
+  console.log(chalk.bold('Learn more:'));
+  console.log(chalk.blue(`  ${fix.violation.helpUrl}`));
+  console.log();
+
+  // WCAG tags
+  const wcagTags = fix.violation.tags.filter(
+    (t) => t.startsWith('wcag') || t.startsWith('best-practice')
+  );
+  if (wcagTags.length > 0) {
+    console.log(chalk.bold('WCAG Criteria:'));
+    wcagTags.forEach((tag) => console.log(`  - ${tag}`));
+    console.log();
+  }
+
+  // Target elements
+  if (fix.violation.nodes.length > 0) {
+    console.log(chalk.bold('Affected elements:'));
+    fix.violation.nodes.slice(0, 5).forEach((node) => {
+      console.log(chalk.dim(`  ${node.target.join(' > ')}`));
+    });
+    if (fix.violation.nodes.length > 5) {
+      console.log(chalk.dim(`  ... and ${fix.violation.nodes.length - 5} more`));
+    }
+    console.log();
+  }
+
+  console.log(chalk.dim('Press any key to continue...'));
+}
+
+/**
+ * Run interactive review mode for fixes
+ */
+async function runInteractiveReview(
+  fixes: PendingFix[]
+): Promise<{ accepted: PendingFix[]; skipped: PendingFix[] }> {
+  const accepted: PendingFix[] = [];
+  const skipped: PendingFix[] = [];
+
+  if (fixes.length === 0) {
+    return { accepted, skipped };
+  }
+
+  // Set up raw mode for single keypress input
+  const stdin = process.stdin;
+  const wasRaw = stdin.isRaw;
+
+  // Enable raw mode if available
+  if (stdin.setRawMode) {
+    stdin.setRawMode(true);
+  }
+  stdin.resume();
+  stdin.setEncoding('utf8');
+
+  let currentIndex = 0;
+  let applyAll = false;
+
+  return new Promise((resolve) => {
+    const processCurrentFix = () => {
+      if (currentIndex >= fixes.length) {
+        // Done - restore terminal
+        if (stdin.setRawMode) {
+          stdin.setRawMode(wasRaw || false);
+        }
+        stdin.pause();
+        clearScreen();
+        resolve({ accepted, skipped });
+        return;
+      }
+
+      const fix = fixes[currentIndex];
+
+      if (applyAll) {
+        // Auto-apply remaining
+        accepted.push(fix);
+        currentIndex++;
+        processCurrentFix();
+        return;
+      }
+
+      displayInteractiveFix(fix, currentIndex, fixes.length);
+    };
+
+    const handleKeypress = (key: string) => {
+      const fix = fixes[currentIndex];
+
+      switch (key.toLowerCase()) {
+        case 'y':
+          accepted.push(fix);
+          currentIndex++;
+          processCurrentFix();
+          break;
+
+        case 'n':
+          skipped.push(fix);
+          currentIndex++;
+          processCurrentFix();
+          break;
+
+        case 'a':
+          // Apply all remaining
+          applyAll = true;
+          accepted.push(fix);
+          currentIndex++;
+          processCurrentFix();
+          break;
+
+        case 'q':
+        case '\x03': // Ctrl+C
+          // Quit - skip remaining
+          for (let i = currentIndex; i < fixes.length; i++) {
+            skipped.push(fixes[i]);
+          }
+          if (stdin.setRawMode) {
+            stdin.setRawMode(wasRaw || false);
+          }
+          stdin.pause();
+          clearScreen();
+          resolve({ accepted, skipped });
+          break;
+
+        case '?':
+          showFixDetails(fix);
+          // Wait for any key to continue
+          stdin.once('data', () => {
+            processCurrentFix();
+          });
+          break;
+
+        default:
+          // Ignore other keys, re-display prompt
+          process.stdout.write(chalk.cyan('> '));
+          break;
+      }
+    };
+
+    stdin.on('data', handleKeypress);
+    processCurrentFix();
+  });
 }
 
 function groupViolationsByFile(report: AllyReport, severity?: Severity): FileViolation[] {

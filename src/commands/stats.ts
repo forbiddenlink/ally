@@ -2,7 +2,7 @@
  * ally stats command - Shows accessibility progress over time
  */
 
-import { readFile, readdir } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { resolve, join } from 'path';
 import chalk from 'chalk';
@@ -14,18 +14,43 @@ import {
   printError,
   animateScoreUp,
 } from '../utils/ui.js';
+import {
+  loadHistory,
+  calculateTrend,
+  formatTrend,
+  renderAsciiChart,
+  type HistoryEntry,
+} from '../utils/history.js';
 import type { AllyReport } from '../types/index.js';
 
-interface HistoryEntry {
+// Legacy history entry format (for backward compatibility)
+interface LegacyHistoryEntry {
   date: string;
   score: number;
-  violations: number;
-  files: number;
+  violations?: number;
+  files?: number;
+  errors?: number;
+  warnings?: number;
+  filesScanned?: number;
+}
+
+/**
+ * Convert legacy history entry to new format
+ */
+function normalizeHistoryEntry(entry: LegacyHistoryEntry): HistoryEntry {
+  return {
+    date: entry.date,
+    score: entry.score,
+    errors: entry.errors ?? entry.violations ?? 0,
+    warnings: entry.warnings ?? 0,
+    filesScanned: entry.filesScanned ?? entry.files ?? 0,
+  };
 }
 
 export async function statsCommand(): Promise<void> {
   printBanner();
 
+  const projectPath = resolve('.');
   const allyDir = resolve('.ally');
 
   if (!existsSync(allyDir)) {
@@ -43,14 +68,15 @@ export async function statsCommand(): Promise<void> {
   const scanContent = await readFile(scanPath, 'utf-8');
   const report: AllyReport = JSON.parse(scanContent);
 
-  // Load history if exists
+  // Load history (use the utility, but also handle legacy format)
   const historyPath = join(allyDir, 'history.json');
   let history: HistoryEntry[] = [];
 
   if (existsSync(historyPath)) {
     try {
       const historyContent = await readFile(historyPath, 'utf-8');
-      history = JSON.parse(historyContent);
+      const rawHistory: LegacyHistoryEntry[] = JSON.parse(historyContent);
+      history = rawHistory.map(normalizeHistoryEntry);
     } catch {
       history = [];
     }
@@ -62,10 +88,27 @@ export async function statsCommand(): Promise<void> {
   const previousScore = history.length > 0 ? history[history.length - 1].score : 0;
   await animateScoreUp(previousScore, report.summary.score);
 
-  // Show trend
+  // Show trend information
+  if (history.length > 0) {
+    const trend = calculateTrend(history, report.summary.score);
+    const trendText = formatTrend(trend);
+    if (trendText) {
+      console.log();
+      console.log(chalk.bold('Trend:'));
+      console.log(trendText);
+    }
+  }
+
+  // Show ASCII chart of score history
+  if (history.length > 1) {
+    console.log();
+    console.log(renderAsciiChart(history, report.summary.score));
+  }
+
+  // Show recent history entries
   if (history.length > 0) {
     console.log();
-    console.log(chalk.bold('📈 Progress History'));
+    console.log(chalk.bold('📈 Recent History'));
     console.log(chalk.dim('─'.repeat(50)));
 
     // Show last 5 entries
@@ -74,7 +117,8 @@ export async function statsCommand(): Promise<void> {
       const date = new Date(entry.date).toLocaleDateString();
       const scoreColor = entry.score >= 75 ? chalk.green : entry.score >= 50 ? chalk.yellow : chalk.red;
       const bar = getSmallBar(entry.score);
-      console.log(`  ${chalk.dim(date)}  ${bar}  ${scoreColor(entry.score.toString().padStart(3))}  (${entry.violations} issues)`);
+      const issues = entry.errors + entry.warnings;
+      console.log(`  ${chalk.dim(date)}  ${bar}  ${scoreColor(entry.score.toString().padStart(3))}  (${issues} issues)`);
     }
 
     // Current
@@ -82,7 +126,7 @@ export async function statsCommand(): Promise<void> {
     const currentColor = report.summary.score >= 75 ? chalk.green : report.summary.score >= 50 ? chalk.yellow : chalk.red;
     console.log(`  ${chalk.bold('Today')}       ${currentBar}  ${currentColor.bold(report.summary.score.toString().padStart(3))}  (${report.summary.totalViolations} issues)`);
 
-    // Calculate improvement
+    // Calculate improvement from first entry
     const firstScore = history[0].score;
     const improvement = report.summary.score - firstScore;
     if (improvement > 0) {

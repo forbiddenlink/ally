@@ -5,18 +5,23 @@
 import puppeteer, { type Browser, type Page, type SerializedAXNode } from 'puppeteer';
 import chalk from 'chalk';
 import boxen from 'boxen';
+import { spawn } from 'child_process';
+import { platform } from 'os';
 import {
   printBanner,
   createSpinner,
   printError,
   printWarning,
   printInfo,
+  printSuccess,
 } from '../utils/ui.js';
 
 interface TreeCommandOptions {
   depth?: number;
   role?: string;
   json?: boolean;
+  speak?: boolean;
+  noAudio?: boolean;
 }
 
 // Tree drawing characters
@@ -355,13 +360,317 @@ function filterByRole(node: AXNode, role: string): AXNode[] {
   return matches;
 }
 
+/**
+ * Generate a screen reader announcement for a node
+ */
+function announceNode(node: AXNode): string {
+  const role = node.role;
+  const name = node.name?.trim() || '';
+
+  // Skip certain roles that don't typically announce
+  const skipRoles = new Set(['none', 'generic', 'RootWebArea', 'InlineTextBox', 'StaticText']);
+  if (skipRoles.has(role)) {
+    // For static text, just return the name
+    if (role === 'StaticText' && name) {
+      return name;
+    }
+    return '';
+  }
+
+  // Handle special cases
+  switch (role) {
+    case 'heading':
+      if (node.level !== undefined) {
+        return name ? `${name}, heading level ${node.level}` : `heading level ${node.level}`;
+      }
+      return name ? `${name}, heading` : 'heading';
+
+    case 'link':
+      return name ? `${name}, link` : 'link';
+
+    case 'button':
+      return name ? `${name}, button` : 'button';
+
+    case 'img':
+    case 'image':
+      return name ? `${name}, image` : 'image';
+
+    case 'navigation':
+      return name ? `${name}, navigation` : 'navigation';
+
+    case 'main':
+      return name ? `${name}, main` : 'main';
+
+    case 'banner':
+      return name ? `${name}, banner` : 'banner';
+
+    case 'contentinfo':
+      return name ? `${name}, content info` : 'content info';
+
+    case 'complementary':
+      return name ? `${name}, complementary` : 'complementary';
+
+    case 'region':
+      return name ? `${name}, region` : 'region';
+
+    case 'search':
+      return name ? `${name}, search` : 'search';
+
+    case 'form':
+      return name ? `${name}, form` : 'form';
+
+    case 'list':
+      const itemCount = node.children?.filter(c =>
+        (c as AXNode).role === 'listitem'
+      ).length || 0;
+      if (itemCount > 0) {
+        return `list with ${itemCount} item${itemCount === 1 ? '' : 's'}`;
+      }
+      return 'list';
+
+    case 'listitem':
+      // List items typically announce their content, not themselves
+      return '';
+
+    case 'textbox':
+    case 'searchbox':
+      const textboxLabel = name ? `${name}, ` : '';
+      const textboxType = role === 'searchbox' ? 'search edit' : 'edit';
+      return `${textboxLabel}${textboxType}`;
+
+    case 'checkbox':
+      const checkState = node.checked ? 'checked' : 'not checked';
+      return name ? `${name}, checkbox, ${checkState}` : `checkbox, ${checkState}`;
+
+    case 'radio':
+      const radioState = node.checked ? 'selected' : 'not selected';
+      return name ? `${name}, radio button, ${radioState}` : `radio button, ${radioState}`;
+
+    case 'combobox':
+      return name ? `${name}, combo box` : 'combo box';
+
+    case 'menubar':
+      return name ? `${name}, menu bar` : 'menu bar';
+
+    case 'menu':
+      return name ? `${name}, menu` : 'menu';
+
+    case 'menuitem':
+      return name ? `${name}, menu item` : 'menu item';
+
+    case 'tab':
+      const tabState = node.selected ? 'selected' : '';
+      return name
+        ? `${name}, tab${tabState ? ', ' + tabState : ''}`
+        : `tab${tabState ? ', ' + tabState : ''}`;
+
+    case 'tablist':
+      return name ? `${name}, tab list` : 'tab list';
+
+    case 'tabpanel':
+      return name ? `${name}, tab panel` : 'tab panel';
+
+    case 'table':
+      return name ? `${name}, table` : 'table';
+
+    case 'row':
+      return ''; // Rows don't typically announce themselves
+
+    case 'cell':
+    case 'gridcell':
+      return name || '';
+
+    case 'columnheader':
+      return name ? `${name}, column header` : 'column header';
+
+    case 'rowheader':
+      return name ? `${name}, row header` : 'row header';
+
+    case 'slider':
+      const sliderValue = node.valuetext || (node.value !== undefined ? String(node.value) : '');
+      return name
+        ? `${name}, slider${sliderValue ? ', ' + sliderValue : ''}`
+        : `slider${sliderValue ? ', ' + sliderValue : ''}`;
+
+    case 'spinbutton':
+      const spinValue = node.valuetext || (node.value !== undefined ? String(node.value) : '');
+      return name
+        ? `${name}, spin button${spinValue ? ', ' + spinValue : ''}`
+        : `spin button${spinValue ? ', ' + spinValue : ''}`;
+
+    case 'switch':
+      const switchState = node.checked ? 'on' : 'off';
+      return name ? `${name}, switch, ${switchState}` : `switch, ${switchState}`;
+
+    case 'progressbar':
+      const progress = node.valuetext || (node.value !== undefined ? `${node.value}%` : '');
+      return name
+        ? `${name}, progress${progress ? ', ' + progress : ''}`
+        : `progress${progress ? ', ' + progress : ''}`;
+
+    case 'dialog':
+      return name ? `${name}, dialog` : 'dialog';
+
+    case 'alert':
+      return name ? `alert, ${name}` : 'alert';
+
+    case 'alertdialog':
+      return name ? `alert dialog, ${name}` : 'alert dialog';
+
+    case 'application':
+      return name ? `${name}, application` : 'application';
+
+    case 'article':
+      return name ? `${name}, article` : 'article';
+
+    case 'figure':
+      return name ? `${name}, figure` : 'figure';
+
+    case 'group':
+      return name ? `${name}, group` : '';
+
+    case 'separator':
+      return 'separator';
+
+    case 'tooltip':
+      return name ? `tooltip, ${name}` : 'tooltip';
+
+    case 'tree':
+      return name ? `${name}, tree` : 'tree';
+
+    case 'treeitem':
+      const expanded = node.expanded !== undefined
+        ? (node.expanded ? ', expanded' : ', collapsed')
+        : '';
+      return name ? `${name}, tree item${expanded}` : `tree item${expanded}`;
+
+    default:
+      // For other roles, announce name and role if both exist
+      if (name) {
+        return `${name}, ${role}`;
+      }
+      return '';
+  }
+}
+
+/**
+ * Walk the accessibility tree and generate announcement text
+ */
+function generateAnnouncement(node: AXNode, depth = 0): string[] {
+  const announcements: string[] = [];
+
+  // Get announcement for current node
+  const announcement = announceNode(node);
+  if (announcement) {
+    announcements.push(announcement);
+  }
+
+  // Process children
+  if (node.children) {
+    for (const child of node.children) {
+      const childAnnouncements = generateAnnouncement(child as AXNode, depth + 1);
+      announcements.push(...childAnnouncements);
+    }
+  }
+
+  return announcements;
+}
+
+/**
+ * Speak text using system TTS
+ */
+async function speakText(text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const os = platform();
+    let command: string;
+    let args: string[];
+
+    switch (os) {
+      case 'darwin':
+        // macOS: use 'say' command
+        command = 'say';
+        args = ['-r', '180', text]; // -r 180 sets a reasonable speaking rate
+        break;
+
+      case 'linux':
+        // Linux: try espeak first, then spd-say
+        // We'll try espeak as it's more commonly available
+        command = 'espeak';
+        args = ['-s', '150', text]; // -s 150 sets words per minute
+        break;
+
+      case 'win32':
+        // Windows: use PowerShell TTS
+        command = 'powershell';
+        args = [
+          '-Command',
+          `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${text.replace(/'/g, "''")}')`
+        ];
+        break;
+
+      default:
+        printWarning(`Text-to-speech not supported on ${os}`);
+        resolve();
+        return;
+    }
+
+    const process = spawn(command, args, { stdio: 'inherit' });
+
+    process.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else if (os === 'linux') {
+        // Try spd-say as fallback on Linux
+        const fallback = spawn('spd-say', ['-r', '-20', text], { stdio: 'inherit' });
+        fallback.on('close', (fallbackCode) => {
+          if (fallbackCode === 0) {
+            resolve();
+          } else {
+            printWarning('TTS not available. Install espeak or speech-dispatcher.');
+            resolve();
+          }
+        });
+        fallback.on('error', () => {
+          printWarning('TTS not available. Install espeak or speech-dispatcher.');
+          resolve();
+        });
+      } else {
+        printWarning(`TTS command failed with code ${code}`);
+        resolve();
+      }
+    });
+
+    process.on('error', (err) => {
+      if (os === 'linux') {
+        // Try spd-say as fallback on Linux
+        const fallback = spawn('spd-say', ['-r', '-20', text], { stdio: 'inherit' });
+        fallback.on('close', (fallbackCode) => {
+          if (fallbackCode === 0) {
+            resolve();
+          } else {
+            printWarning('TTS not available. Install espeak or speech-dispatcher.');
+            resolve();
+          }
+        });
+        fallback.on('error', () => {
+          printWarning('TTS not available. Install espeak or speech-dispatcher.');
+          resolve();
+        });
+      } else {
+        printWarning(`TTS not available: ${err.message}`);
+        resolve();
+      }
+    });
+  });
+}
+
 export async function treeCommand(
   url: string,
   options: TreeCommandOptions = {}
 ): Promise<void> {
   printBanner();
 
-  const { depth = 5, role, json = false } = options;
+  const { depth = 5, role, json = false, speak = false, noAudio = false } = options;
 
   // Validate URL
   let targetUrl = url;
@@ -459,6 +768,45 @@ export async function treeCommand(
     console.log(chalk.dim('Legend:'));
     console.log(chalk.dim(`  ${chalk.cyan('role')} ${chalk.white('"name"')} ${chalk.gray('[properties]')}`));
     console.log();
+
+    // Screen reader simulation
+    if (speak) {
+      // Generate announcement from the tree
+      const treeToAnnounce = role
+        ? filterByRole(snapshot as AXNode, role)
+        : [snapshot as AXNode];
+
+      const allAnnouncements: string[] = [];
+      for (const tree of treeToAnnounce) {
+        const announcements = generateAnnouncement(tree);
+        allAnnouncements.push(...announcements);
+      }
+
+      // Join announcements into readable text
+      const announcementText = allAnnouncements.join('. ').replace(/\.\./g, '.');
+
+      // Print the announcement
+      console.log(chalk.yellow.bold('Screen Reader Announcement:'));
+      console.log(
+        boxen(
+          chalk.white(`"${announcementText}"`),
+          {
+            padding: { top: 0, bottom: 0, left: 1, right: 1 },
+            borderStyle: 'round',
+            borderColor: 'yellow',
+          }
+        )
+      );
+      console.log();
+
+      // Play the announcement if audio is enabled
+      if (!noAudio) {
+        printInfo('Playing announcement...');
+        await speakText(announcementText);
+        printSuccess('Announcement complete.');
+        console.log();
+      }
+    }
   } catch (error) {
     spinner.fail(`Failed to fetch accessibility tree`);
     if (error instanceof Error) {
