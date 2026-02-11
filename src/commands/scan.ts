@@ -31,7 +31,7 @@ import {
   formatScanError,
   isPuppeteerError,
 } from '../utils/errors.js';
-import { loadConfig, type AllyConfig } from '../utils/config.js';
+import { loadConfig, loadIgnorePatterns, type AllyConfig } from '../utils/config.js';
 import type { ScanResult, AllyReport, Violation, Severity } from '../types/index.js';
 
 /**
@@ -132,6 +132,14 @@ export async function scanCommand(
   const mergedFormat = options.format ?? (config.report?.format as OutputFormat | undefined);
   const mergedStandard = options.standard ?? (config.scan?.standard as WcagStandard | undefined) ?? DEFAULT_STANDARD;
 
+  // Load ignore patterns from .allyignore
+  const { patterns: ignorePatterns, ignorePath } = await loadIgnorePatterns();
+  // Merge with config ignore patterns
+  const allIgnorePatterns = [...ignorePatterns, ...(config.scan?.ignore ?? [])];
+  if (ignorePath) {
+    printInfo(`Using ignore patterns from ${ignorePath}`);
+  }
+
   const { url, json = false, verbose = false, simulate } = options;
 
   // URL scanning mode
@@ -140,7 +148,7 @@ export async function scanCommand(
   }
 
   // File scanning mode
-  return await scanFiles(targetPath, mergedOutput, json, verbose, mergedFormat, mergedStandard);
+  return await scanFiles(targetPath, mergedOutput, json, verbose, mergedFormat, mergedStandard, allIgnorePatterns);
 }
 
 async function scanUrl(
@@ -237,7 +245,8 @@ async function scanFiles(
   json: boolean,
   verbose: boolean,
   format?: OutputFormat,
-  standard: WcagStandard = DEFAULT_STANDARD
+  standard: WcagStandard = DEFAULT_STANDARD,
+  ignorePatterns: string[] = []
 ): Promise<AllyReport | null> {
   const absolutePath = resolve(targetPath);
 
@@ -245,8 +254,8 @@ async function scanFiles(
   const findSpinner = createSpinner(`Finding files to scan (${standard})...`);
   findSpinner.start();
 
-  const htmlFiles = await findHtmlFiles(absolutePath);
-  const componentFiles = await findComponentFiles(absolutePath);
+  const htmlFiles = await findHtmlFiles(absolutePath, ignorePatterns);
+  const componentFiles = await findComponentFiles(absolutePath, ignorePatterns);
   const allFiles = [...htmlFiles];
 
   if (allFiles.length === 0) {

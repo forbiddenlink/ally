@@ -12,6 +12,9 @@
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { resolve, dirname, join } from 'path';
+
+/** Ignore file names to search for (in order of priority) */
+const IGNORE_FILES = ['.allyignore', '.ally-ignore'];
 import type { Severity } from '../types/index.js';
 import type { WcagStandard } from './scanner.js';
 
@@ -251,4 +254,88 @@ export function mergeOptions<T extends Record<string, unknown>>(
   }
 
   return merged;
+}
+
+/**
+ * Search for .allyignore file starting from directory and moving up to root
+ */
+async function findIgnoreFile(startDir: string): Promise<string | null> {
+  let currentDir = resolve(startDir);
+  const root = dirname(currentDir);
+
+  while (currentDir !== root) {
+    for (const ignoreFile of IGNORE_FILES) {
+      const ignorePath = join(currentDir, ignoreFile);
+      if (existsSync(ignorePath)) {
+        return ignorePath;
+      }
+    }
+    currentDir = dirname(currentDir);
+  }
+
+  // Check root as well
+  for (const ignoreFile of IGNORE_FILES) {
+    const ignorePath = join(currentDir, ignoreFile);
+    if (existsSync(ignorePath)) {
+      return ignorePath;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Parse ignore file content into glob patterns
+ *
+ * Supports glob patterns, directory patterns (ending with /),
+ * comments (lines starting with #), and blank lines.
+ */
+function parseIgnoreFile(content: string): string[] {
+  return content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((pattern) => {
+      // Convert directory patterns to glob patterns
+      if (pattern.endsWith('/')) {
+        return `**/${pattern}**`;
+      }
+      // Ensure patterns without slashes match anywhere
+      if (!pattern.includes('/') && !pattern.startsWith('**/')) {
+        return `**/${pattern}`;
+      }
+      return pattern;
+    });
+}
+
+/** Result from loading ignore patterns */
+export interface IgnoreResult {
+  patterns: string[];
+  ignorePath: string | null;
+}
+
+/**
+ * Load ignore patterns from .allyignore file
+ *
+ * Searches current directory and parent directories for ignore file.
+ * Returns empty patterns array if no file is found.
+ *
+ * @param startDir - Directory to start searching from (defaults to cwd)
+ * @returns Loaded ignore patterns and path to ignore file (if found)
+ */
+export async function loadIgnorePatterns(startDir: string = process.cwd()): Promise<IgnoreResult> {
+  const ignorePath = await findIgnoreFile(startDir);
+
+  if (!ignorePath) {
+    return { patterns: [], ignorePath: null };
+  }
+
+  try {
+    const content = await readFile(ignorePath, 'utf-8');
+    const patterns = parseIgnoreFile(content);
+    return { patterns, ignorePath };
+  } catch {
+    // If we can't read the file, return empty patterns
+    return { patterns: [], ignorePath: null };
+  }
 }

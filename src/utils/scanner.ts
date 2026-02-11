@@ -293,21 +293,24 @@ export class AccessibilityScanner {
   }
 }
 
-export async function findHtmlFiles(targetPath: string): Promise<string[]> {
+/** Default ignore patterns applied to all scans */
+const DEFAULT_IGNORE = ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'];
+
+export async function findHtmlFiles(targetPath: string, extraIgnore: string[] = []): Promise<string[]> {
   const patterns = SUPPORTED_EXTENSIONS.map((ext) => `**/*${ext}`);
   const files = await glob(patterns, {
     cwd: targetPath,
-    ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
+    ignore: [...DEFAULT_IGNORE, ...extraIgnore],
     absolute: true,
   });
   return files;
 }
 
-export async function findComponentFiles(targetPath: string): Promise<string[]> {
+export async function findComponentFiles(targetPath: string, extraIgnore: string[] = []): Promise<string[]> {
   const patterns = COMPONENT_EXTENSIONS.map((ext) => `**/*${ext}`);
   const files = await glob(patterns, {
     cwd: targetPath,
-    ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
+    ignore: [...DEFAULT_IGNORE, ...extraIgnore],
     absolute: true,
   });
   return files;
