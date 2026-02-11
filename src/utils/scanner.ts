@@ -87,8 +87,16 @@ const COLOR_BLINDNESS_FILTERS: Record<ColorBlindnessType, string> = {
   `,
 };
 
+/** Default page load timeout in milliseconds */
+export const DEFAULT_TIMEOUT = 30000;
+
 export class AccessibilityScanner {
   private browser: Browser | null = null;
+  private timeout: number;
+
+  constructor(timeout: number = DEFAULT_TIMEOUT) {
+    this.timeout = timeout;
+  }
 
   async init(): Promise<void> {
     this.browser = await puppeteer.launch({
@@ -115,7 +123,7 @@ export class AccessibilityScanner {
       const absolutePath = resolve(filePath);
       const fileUrl = `file://${absolutePath}`;
 
-      await page.goto(fileUrl, { waitUntil: 'load', timeout: 30000 });
+      await page.goto(fileUrl, { waitUntil: 'load', timeout: this.timeout });
 
       // Wait for page to be ready
       await page.waitForSelector('body');
@@ -160,7 +168,7 @@ export class AccessibilityScanner {
     const page = await this.browser.newPage();
 
     try {
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: this.timeout });
 
       const tags = standardToTags[standard];
       const results = await new AxePuppeteer(page)
@@ -253,7 +261,7 @@ export class AccessibilityScanner {
       // Set a reasonable viewport size
       await page.setViewport({ width: 1280, height: 800 });
 
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: this.timeout });
 
       // Get the SVG filter for the specified color blindness type
       const svgFilter = COLOR_BLINDNESS_FILTERS[type];

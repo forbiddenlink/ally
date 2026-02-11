@@ -60,8 +60,18 @@ program
     }
     return value;
   })
+  .option('-T, --timeout <ms>', 'Page load timeout in milliseconds (default: 30000)')
   .action(async (path: string | undefined, options) => {
     try {
+      // Parse timeout if provided
+      if (options.timeout !== undefined) {
+        const timeout = parseInt(options.timeout, 10);
+        if (isNaN(timeout) || timeout < 1000) {
+          console.error('Error: --timeout must be at least 1000 (1 second)');
+          process.exit(1);
+        }
+        options.timeout = timeout;
+      }
       // Parse threshold if provided
       if (options.threshold !== undefined) {
         const threshold = parseInt(options.threshold, 10);

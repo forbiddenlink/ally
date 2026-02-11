@@ -8,7 +8,7 @@ type Shell = 'bash' | 'zsh' | 'fish';
 const COMMANDS = {
   scan: {
     description: 'Scan files for accessibility violations',
-    options: ['-o', '--output', '-u', '--url', '-j', '--json', '-f', '--format', '-v', '--verbose', '-t', '--threshold', '--ci', '-F', '--fail-on', '-S', '--simulate', '-s', '--standard'],
+    options: ['-o', '--output', '-u', '--url', '-j', '--json', '-f', '--format', '-v', '--verbose', '-t', '--threshold', '--ci', '-F', '--fail-on', '-S', '--simulate', '-s', '--standard', '-T', '--timeout'],
   },
   explain: {
     description: 'Get plain-language explanations of violations',

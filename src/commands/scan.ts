@@ -14,6 +14,7 @@ import {
   type ColorBlindnessType,
   type WcagStandard,
   DEFAULT_STANDARD,
+  DEFAULT_TIMEOUT,
   standardToTags,
 } from '../utils/scanner.js';
 import {
@@ -51,6 +52,7 @@ interface ScanCommandOptions {
   format?: OutputFormat;
   simulate?: ColorBlindnessType;
   standard?: WcagStandard;
+  timeout?: number;
 }
 
 // SARIF 2.1.0 types
@@ -140,15 +142,16 @@ export async function scanCommand(
     printInfo(`Using ignore patterns from ${ignorePath}`);
   }
 
-  const { url, json = false, verbose = false, simulate } = options;
+  const { url, json = false, verbose = false, simulate, timeout } = options;
+  const mergedTimeout = timeout ?? DEFAULT_TIMEOUT;
 
   // URL scanning mode
   if (url) {
-    return await scanUrl(url, mergedOutput, json, verbose, mergedFormat, simulate, mergedStandard);
+    return await scanUrl(url, mergedOutput, json, verbose, mergedFormat, simulate, mergedStandard, mergedTimeout);
   }
 
   // File scanning mode
-  return await scanFiles(targetPath, mergedOutput, json, verbose, mergedFormat, mergedStandard, allIgnorePatterns);
+  return await scanFiles(targetPath, mergedOutput, json, verbose, mergedFormat, mergedStandard, allIgnorePatterns, mergedTimeout);
 }
 
 async function scanUrl(
@@ -158,12 +161,13 @@ async function scanUrl(
   verbose: boolean,
   format?: OutputFormat,
   simulate?: ColorBlindnessType,
-  standard: WcagStandard = DEFAULT_STANDARD
+  standard: WcagStandard = DEFAULT_STANDARD,
+  timeout: number = DEFAULT_TIMEOUT
 ): Promise<AllyReport | null> {
   const spinner = createSpinner(`Scanning ${url} (${standard})...`);
   spinner.start();
 
-  const scanner = new AccessibilityScanner();
+  const scanner = new AccessibilityScanner(timeout);
 
   try {
     await scanner.init();
@@ -246,7 +250,8 @@ async function scanFiles(
   verbose: boolean,
   format?: OutputFormat,
   standard: WcagStandard = DEFAULT_STANDARD,
-  ignorePatterns: string[] = []
+  ignorePatterns: string[] = [],
+  timeout: number = DEFAULT_TIMEOUT
 ): Promise<AllyReport | null> {
   const absolutePath = resolve(targetPath);
 
@@ -271,7 +276,7 @@ async function scanFiles(
   }
 
   // Scan files
-  const scanner = new AccessibilityScanner();
+  const scanner = new AccessibilityScanner(timeout);
   const results: ScanResult[] = [];
   const errors: Array<{ path: string; error: string }> = [];
 
