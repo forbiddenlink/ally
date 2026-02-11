@@ -26,6 +26,10 @@ import { treeCommand } from './commands/tree.js';
 import { triageCommand } from './commands/triage.js';
 import { prCheckCommand } from './commands/pr-check.js';
 import { completionCommand } from './commands/completion.js';
+import { doctorCommand } from './commands/doctor.js';
+import { healthCommand } from './commands/health.js';
+import { scanStorybookCommand } from './commands/scan-storybook.js';
+import { auditPaletteCommand } from './commands/audit-palette.js';
 
 const program = new Command();
 
@@ -61,6 +65,13 @@ program
     return value;
   })
   .option('-T, --timeout <ms>', 'Page load timeout in milliseconds (default: 30000)')
+  .option('-B, --browser <browser>', 'Browser engine: chromium, firefox, webkit (default: chromium)', (value: string) => {
+    const valid = ['chromium', 'firefox', 'webkit'];
+    if (!valid.includes(value)) {
+      throw new Error(`Invalid browser: ${value}. Valid options: ${valid.join(', ')}`);
+    }
+    return value;
+  })
   .option('--experimental-apca', 'Show APCA Lc values alongside WCAG 2.x contrast ratios (experimental)')
   .action(async (path: string | undefined, options) => {
     try {
@@ -149,6 +160,7 @@ program
   .option('-s, --severity <level>', 'Filter by severity (critical, serious, moderate, minor)')
   .option('-a, --auto', 'Automatically apply all fixes without prompting')
   .option('-d, --dry-run', 'Show what would be fixed without making changes')
+  .option('-y, --yes', 'Skip interactive review, apply all suggested fixes')
   .action(async (options) => {
     try {
       await fixCommand(options);
@@ -298,6 +310,8 @@ program
   .option('-d, --depth <number>', 'Maximum tree depth to display', '5')
   .option('-r, --role <role>', 'Filter to specific ARIA role')
   .option('-j, --json', 'Output as JSON')
+  .option('-s, --speak', 'Simulate screen reader announcement')
+  .option('--no-audio', 'Print announcement but skip TTS playback (use with --speak)')
   .action(async (url: string, options) => {
     try {
       const depth = parseInt(options.depth, 10);
@@ -310,6 +324,8 @@ program
         depth,
         role: options.role,
         json: options.json,
+        speak: options.speak,
+        noAudio: !options.audio, // Commander converts --no-audio to audio: false
       });
     } catch (error) {
       console.error('Tree failed:', error);
@@ -361,6 +377,123 @@ program
       await completionCommand(shell);
     } catch (error) {
       console.error('Completion failed:', error);
+      process.exit(1);
+    }
+  });
+
+// ally doctor
+program
+  .command('doctor')
+  .description('Diagnose installation and configuration issues')
+  .action(async () => {
+    try {
+      await doctorCommand();
+    } catch (error) {
+      console.error('Doctor failed:', error);
+      process.exit(1);
+    }
+  });
+
+// ally health
+program
+  .command('health')
+  .description('Quick accessibility health check (like npm audit)')
+  .option('-p, --path <path>', 'Path to scan', '.')
+  .option('-s, --standard <level>', 'WCAG standard to test against (default: wcag22aa)', (value: string) => {
+    const valid = ['wcag2a', 'wcag2aa', 'wcag2aaa', 'wcag21a', 'wcag21aa', 'wcag21aaa', 'wcag22aa', 'section508', 'best-practice'];
+    if (!valid.includes(value)) {
+      throw new Error(`Invalid standard: ${value}. Valid options: ${valid.join(', ')}`);
+    }
+    return value;
+  })
+  .option('-i, --input <file>', 'Use existing scan results instead of scanning')
+  .action(async (options) => {
+    try {
+      await healthCommand(options);
+    } catch (error) {
+      console.error('Health check failed:', error);
+      process.exit(1);
+    }
+  });
+
+// ally scan-storybook
+program
+  .command('scan-storybook')
+  .description('Scan Storybook stories for accessibility issues')
+  .option('-u, --url <url>', 'Storybook URL (default: http://localhost:6006)', 'http://localhost:6006')
+  .option('-T, --timeout <ms>', 'Page load timeout in milliseconds (default: 10000)', '10000')
+  .option('-f, --filter <pattern>', 'Filter stories by name pattern')
+  .option('-F, --format <format>', 'Output format (default, json, csv)', 'default')
+  .option('-o, --output <dir>', 'Output directory for results', '.ally')
+  .option('-s, --standard <level>', 'WCAG standard to test against (default: wcag22aa)', (value: string) => {
+    const valid = ['wcag2a', 'wcag2aa', 'wcag2aaa', 'wcag21a', 'wcag21aa', 'wcag21aaa', 'wcag22aa', 'section508', 'best-practice'];
+    if (!valid.includes(value)) {
+      throw new Error(`Invalid standard: ${value}. Valid options: ${valid.join(', ')}`);
+    }
+    return value;
+  })
+  .action(async (options) => {
+    try {
+      // Parse timeout if provided
+      const timeout = parseInt(options.timeout, 10);
+      if (isNaN(timeout) || timeout < 1000) {
+        console.error('Error: --timeout must be at least 1000 (1 second)');
+        process.exit(1);
+      }
+
+      // Validate format
+      const validFormats = ['default', 'json', 'csv'];
+      if (!validFormats.includes(options.format)) {
+        console.error(`Error: --format must be one of: ${validFormats.join(', ')}`);
+        process.exit(1);
+      }
+
+      await scanStorybookCommand({
+        url: options.url,
+        timeout,
+        filter: options.filter,
+        format: options.format,
+        output: options.output,
+        standard: options.standard,
+      });
+    } catch (error) {
+      console.error('Storybook scan failed:', error);
+      process.exit(1);
+    }
+  });
+
+// ally audit-palette
+program
+  .command('audit-palette <file>')
+  .description('Audit a design system color palette for contrast issues')
+  .option('-f, --format <format>', 'Output format (default, json, csv)', 'default')
+  .option('-l, --level <level>', 'Minimum WCAG level to pass (aa, aaa)', 'aa')
+  .option('--large-text', 'Use large text thresholds (3:1 for AA)')
+  .option('--apca', 'Include APCA contrast values in output')
+  .action(async (file: string, options) => {
+    try {
+      // Validate level
+      const validLevels = ['aa', 'aaa'];
+      if (!validLevels.includes(options.level)) {
+        console.error(`Error: --level must be one of: ${validLevels.join(', ')}`);
+        process.exit(1);
+      }
+
+      // Validate format
+      const validFormats = ['default', 'json', 'csv'];
+      if (!validFormats.includes(options.format)) {
+        console.error(`Error: --format must be one of: ${validFormats.join(', ')}`);
+        process.exit(1);
+      }
+
+      await auditPaletteCommand(file, {
+        format: options.format,
+        level: options.level,
+        largeText: options.largeText,
+        apca: options.apca,
+      });
+    } catch (error) {
+      console.error('Palette audit failed:', error);
       process.exit(1);
     }
   });
