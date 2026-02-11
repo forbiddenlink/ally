@@ -13,8 +13,10 @@ import {
   createReport,
   type ColorBlindnessType,
   type WcagStandard,
+  type BrowserType,
   DEFAULT_STANDARD,
   DEFAULT_TIMEOUT,
+  DEFAULT_BATCH_SIZE,
   standardToTags,
 } from '../utils/scanner.js';
 import {
@@ -33,11 +35,21 @@ import {
   printFileHeader,
 } from '../utils/ui.js';
 import {
+  detectProject,
+  countProjectFiles,
+  getProjectDescription,
+  type ProjectInfo,
+} from '../utils/detect.js';
+import {
   suggestUrl,
   formatScanError,
   isPuppeteerError,
 } from '../utils/errors.js';
 import { loadConfig, loadIgnorePatterns, type AllyConfig } from '../utils/config.js';
+import {
+  saveHistoryEntry,
+  createHistoryEntry,
+} from '../utils/history.js';
 import type { ScanResult, AllyReport, Violation, Severity } from '../types/index.js';
 
 /**
@@ -49,6 +61,17 @@ function isNoColor(): boolean {
 
 type OutputFormat = 'json' | 'sarif' | 'junit' | 'csv';
 
+/**
+ * Print CI-friendly summary line
+ * Errors = critical + serious, Warnings = moderate + minor
+ */
+function printCiSummary(summary: { bySeverity: Record<string, number> }): void {
+  const errors = (summary.bySeverity.critical ?? 0) + (summary.bySeverity.serious ?? 0);
+  const warnings = (summary.bySeverity.moderate ?? 0) + (summary.bySeverity.minor ?? 0);
+  const symbol = errors > 0 ? '\u2717' : '\u2713';
+  console.log(`${symbol} ${errors} error${errors !== 1 ? 's' : ''}, ${warnings} warning${warnings !== 1 ? 's' : ''}`);
+}
+
 interface ScanCommandOptions {
   output?: string;
   url?: string;
@@ -59,6 +82,8 @@ interface ScanCommandOptions {
   standard?: WcagStandard;
   timeout?: number;
   noCache?: boolean;
+  ci?: boolean;
+  browser?: BrowserType;
 }
 
 // SARIF 2.1.0 types
@@ -120,14 +145,18 @@ export async function scanCommand(
   targetPath: string = '.',
   options: ScanCommandOptions = {}
 ): Promise<AllyReport | null> {
-  printBanner();
+  const ci = options.ci ?? false;
+
+  if (!ci) {
+    printBanner();
+  }
 
   // Load config file (if exists)
   let config: AllyConfig = {};
   try {
     const { config: loadedConfig, configPath } = await loadConfig();
     config = loadedConfig;
-    if (configPath) {
+    if (configPath && !ci) {
       printInfo(`Using config from ${configPath}`);
     }
   } catch (error) {
@@ -144,21 +173,40 @@ export async function scanCommand(
   const { patterns: ignorePatterns, ignorePath } = await loadIgnorePatterns();
   // Merge with config ignore patterns
   const allIgnorePatterns = [...ignorePatterns, ...(config.scan?.ignore ?? [])];
-  if (ignorePath) {
+  if (ignorePath && !ci) {
     printInfo(`Using ignore patterns from ${ignorePath}`);
   }
 
-  const { url, json = false, verbose = false, simulate, timeout } = options;
+  const { url, json = false, verbose = false, simulate, timeout, browser = 'chromium' } = options;
   const mergedTimeout = timeout ?? DEFAULT_TIMEOUT;
+  const mergedBrowser = browser;
 
   // URL scanning mode
   if (url) {
-    return await scanUrl(url, mergedOutput, json, verbose, mergedFormat, simulate, mergedStandard, mergedTimeout);
+    return await scanUrl(url, mergedOutput, json, verbose, mergedFormat, simulate, mergedStandard, mergedTimeout, ci, mergedBrowser);
   }
 
   // File scanning mode
   const noCache = options.noCache ?? false;
-  return await scanFiles(targetPath, mergedOutput, json, verbose, mergedFormat, mergedStandard, allIgnorePatterns, mergedTimeout, noCache);
+
+  // Auto-detect project type when using default path
+  let projectInfo: ProjectInfo | null = null;
+  if (targetPath === '.') {
+    const absolutePath = resolve(targetPath);
+    projectInfo = await detectProject(absolutePath);
+
+    if (!ci && projectInfo.type !== 'unknown') {
+      const description = getProjectDescription(projectInfo.type);
+      const fileCount = await countProjectFiles(absolutePath, projectInfo.patterns);
+
+      printSuccess(`Detected: ${description}`);
+      printInfo(`Scanning: ${projectInfo.patterns.join(', ')}`);
+      printInfo(`Found: ${fileCount} ${projectInfo.type === 'html' ? 'HTML' : 'component'} files`);
+      console.log();
+    }
+  }
+
+  return await scanFiles(targetPath, mergedOutput, json, verbose, mergedFormat, mergedStandard, allIgnorePatterns, mergedTimeout, noCache, ci, projectInfo, mergedBrowser);
 }
 
 async function scanUrl(
@@ -169,75 +217,90 @@ async function scanUrl(
   format?: OutputFormat,
   simulate?: ColorBlindnessType,
   standard: WcagStandard = DEFAULT_STANDARD,
-  timeout: number = DEFAULT_TIMEOUT
+  timeout: number = DEFAULT_TIMEOUT,
+  ci: boolean = false,
+  browser: BrowserType = 'chromium'
 ): Promise<AllyReport | null> {
-  const spinner = createSpinner(`Scanning ${url} (${standard})...`);
-  spinner.start();
+  let spinner: ReturnType<typeof createSpinner> | null = null;
+  const browserLabel = browser !== 'chromium' ? ` [${browser}]` : '';
+  if (!ci) {
+    spinner = createSpinner(`Scanning ${url} (${standard})${browserLabel}...`);
+    spinner.start();
+  }
 
-  const scanner = new AccessibilityScanner(timeout);
+  const scanner = new AccessibilityScanner(timeout, browser);
 
   try {
     await scanner.init();
     const result = await scanner.scanUrl(url, standard);
 
-    spinner.succeed(`Scanned ${url} using ${standard}`);
+    if (spinner) {
+      spinner.succeed(`Scanned ${url} using ${standard}`);
+    }
 
     const report = createReport([result]);
 
-    // Print violations
-    if (result.violations.length > 0) {
-      console.log();
-      for (const violation of result.violations) {
-        if (verbose || violation.impact === 'critical' || violation.impact === 'serious') {
-          printViolation(violation);
+    if (ci) {
+      // CI mode: only print summary line
+      printCiSummary(report.summary);
+    } else {
+      // Print violations
+      if (result.violations.length > 0) {
+        console.log();
+        for (const violation of result.violations) {
+          if (verbose || violation.impact === 'critical' || violation.impact === 'serious') {
+            printViolation(violation);
+          }
         }
       }
-    }
 
-    // Print summary
-    printSummary(report.summary);
+      // Print summary
+      printSummary(report.summary);
 
-    // Save report
-    await saveReport(report, outputDir, format);
+      // Save report
+      await saveReport(report, outputDir, format);
 
-    // Color blindness simulation
-    if (simulate) {
-      const simSpinner = createSpinner(`Generating ${simulate} simulation...`);
-      simSpinner.start();
+      // Color blindness simulation
+      if (simulate) {
+        const simSpinner = createSpinner(`Generating ${simulate} simulation...`);
+        simSpinner.start();
 
-      try {
-        // Ensure output directory exists
-        if (!existsSync(outputDir)) {
-          await mkdir(outputDir, { recursive: true });
+        try {
+          // Ensure output directory exists
+          if (!existsSync(outputDir)) {
+            await mkdir(outputDir, { recursive: true });
+          }
+
+          const screenshotPath = resolve(outputDir, `simulation-${simulate}.png`);
+          await scanner.simulateColorBlindness(url, simulate, screenshotPath);
+          simSpinner.succeed(`Color blindness simulation saved`);
+          printInfo(`Screenshot saved to: ${screenshotPath}`);
+        } catch (simError) {
+          simSpinner.fail(`Failed to generate simulation`);
+          printError(simError instanceof Error ? simError.message : String(simError));
         }
-
-        const screenshotPath = resolve(outputDir, `simulation-${simulate}.png`);
-        await scanner.simulateColorBlindness(url, simulate, screenshotPath);
-        simSpinner.succeed(`Color blindness simulation saved`);
-        printInfo(`Screenshot saved to: ${screenshotPath}`);
-      } catch (simError) {
-        simSpinner.fail(`Failed to generate simulation`);
-        printError(simError instanceof Error ? simError.message : String(simError));
       }
-    }
 
-    // Output to stdout if requested
-    if (format === 'sarif') {
-      const sarifReport = convertToSarif(report);
-      console.log(JSON.stringify(sarifReport, null, 2));
-    } else if (format === 'junit') {
-      const junitReport = convertToJunit(report);
-      console.log(junitReport);
-    } else if (format === 'csv') {
-      const csvReport = convertToCsv(report);
-      console.log(csvReport);
-    } else if (json) {
-      console.log(JSON.stringify(report, null, 2));
+      // Output to stdout if requested
+      if (format === 'sarif') {
+        const sarifReport = convertToSarif(report);
+        console.log(JSON.stringify(sarifReport, null, 2));
+      } else if (format === 'junit') {
+        const junitReport = convertToJunit(report);
+        console.log(junitReport);
+      } else if (format === 'csv') {
+        const csvReport = convertToCsv(report);
+        console.log(csvReport);
+      } else if (json) {
+        console.log(JSON.stringify(report, null, 2));
+      }
     }
 
     return report;
   } catch (error) {
-    spinner.fail(`Failed to scan ${url}`);
+    if (spinner) {
+      spinner.fail(`Failed to scan ${url}`);
+    }
     const err = error instanceof Error ? error : new Error(String(error));
     if (isPuppeteerError(err)) {
       formatScanError(err, url);
@@ -259,89 +322,123 @@ async function scanFiles(
   standard: WcagStandard = DEFAULT_STANDARD,
   ignorePatterns: string[] = [],
   timeout: number = DEFAULT_TIMEOUT,
-  noCache: boolean = false
+  noCache: boolean = false,
+  ci: boolean = false,
+  projectInfo: ProjectInfo | null = null,
+  browser: BrowserType = 'chromium'
 ): Promise<AllyReport | null> {
   const absolutePath = resolve(targetPath);
+  const browserLabel = browser !== 'chromium' ? ` [${browser}]` : '';
 
   // Find files
-  const findSpinner = createSpinner(`Finding files to scan (${standard})...`);
-  findSpinner.start();
+  let findSpinner: ReturnType<typeof createSpinner> | null = null;
+  if (!ci) {
+    findSpinner = createSpinner(`Finding files to scan (${standard})${browserLabel}...`);
+    findSpinner.start();
+  }
 
   const htmlFiles = await findHtmlFiles(absolutePath, ignorePatterns);
   const componentFiles = await findComponentFiles(absolutePath, ignorePatterns);
   const allFiles = [...htmlFiles];
 
   if (allFiles.length === 0) {
-    findSpinner.stop();
-    suggestUrl();
+    if (findSpinner) {
+      findSpinner.stop();
+    }
+    if (!ci) {
+      suggestUrl();
+    }
     return null;
   }
 
-  findSpinner.succeed(`Found ${allFiles.length} HTML file${allFiles.length === 1 ? '' : 's'} (using ${standard})`);
+  if (findSpinner) {
+    findSpinner.succeed(`Found ${allFiles.length} HTML file${allFiles.length === 1 ? '' : 's'} (using ${standard})`);
+  }
 
-  if (componentFiles.length > 0) {
+  if (!ci && componentFiles.length > 0) {
     printInfo(`Also found ${componentFiles.length} component files (use --url to scan rendered output)`);
   }
 
   // Scan files
-  const scanner = new AccessibilityScanner(timeout);
+  const scanner = new AccessibilityScanner(timeout, browser);
   const results: ScanResult[] = [];
   const errors: Array<{ path: string; error: string }> = [];
   let skippedCount = 0;
 
   // Use progress bar for multi-file scanning, or simple text for NO_COLOR
-  const useProgressBar = !isNoColor() && allFiles.length > 1;
+  // In CI mode, skip all progress indicators
+  const useProgressBar = !ci && !isNoColor() && allFiles.length > 1;
   let progressBar: cliProgress.SingleBar | null = null;
   let scanSpinner: ReturnType<typeof createSpinner> | null = null;
 
-  if (useProgressBar) {
-    progressBar = new cliProgress.SingleBar({
-      format: 'Scanning |{bar}| {percentage}% | {value}/{total} files | {filename}',
-      barCompleteChar: '\u2588',
-      barIncompleteChar: '\u2591',
-      hideCursor: true,
-      clearOnComplete: true,
-    }, cliProgress.Presets.shades_classic);
-    progressBar.start(allFiles.length, 0, { filename: '' });
-  } else {
-    scanSpinner = createSpinner(`Scanning ${allFiles.length} files...`);
-    scanSpinner.start();
+  if (!ci) {
+    if (useProgressBar) {
+      progressBar = new cliProgress.SingleBar({
+        format: 'Scanning |{bar}| {percentage}% | {value}/{total} files | {filename}',
+        barCompleteChar: '\u2588',
+        barIncompleteChar: '\u2591',
+        hideCursor: true,
+        clearOnComplete: true,
+      }, cliProgress.Presets.shades_classic);
+      progressBar.start(allFiles.length, 0, { filename: '' });
+    } else {
+      scanSpinner = createSpinner(`Scanning ${allFiles.length} files...`);
+      scanSpinner.start();
+    }
   }
 
   try {
     await scanner.init();
 
-    for (let i = 0; i < allFiles.length; i++) {
-      const file = allFiles[i];
-      const relPath = relative(absolutePath, file);
-
-      if (progressBar) {
-        progressBar.update(i, { filename: relPath });
-      } else if (scanSpinner) {
-        scanSpinner.text = `Scanning ${relPath} (${i + 1}/${allFiles.length})`;
+    // Phase 1: Check cache for all files (unless --no-cache)
+    const filesToScan: string[] = [];
+    if (!noCache) {
+      for (const file of allFiles) {
+        const cachedResult = await getCachedResult(file, standard);
+        if (cachedResult) {
+          results.push(cachedResult);
+          skippedCount++;
+        } else {
+          filesToScan.push(file);
+        }
       }
+    } else {
+      filesToScan.push(...allFiles);
+    }
 
-      try {
-        // Check cache first (unless --no-cache is set)
-        if (!noCache) {
-          const cachedResult = await getCachedResult(file, standard);
-          if (cachedResult) {
-            results.push(cachedResult);
-            skippedCount++;
-            continue;
+    // Phase 2: Scan uncached files in parallel batches
+    if (filesToScan.length > 0) {
+      let scannedCount = 0;
+      const { results: scanResults, errors: scanErrors } = await scanner.scanHtmlFilesParallel(
+        filesToScan,
+        standard,
+        DEFAULT_BATCH_SIZE,
+        (completed, total, currentFile) => {
+          scannedCount = completed;
+          const relPath = currentFile ? relative(absolutePath, currentFile) : '';
+          if (progressBar) {
+            progressBar.update(skippedCount + completed, { filename: relPath });
+          } else if (scanSpinner) {
+            scanSpinner.text = `Scanning ${relPath} (${skippedCount + completed}/${allFiles.length})`;
           }
         }
+      );
 
-        // Scan the file
-        const result = await scanner.scanHtmlFile(file, standard);
-        results.push(result);
+      // Add scan results
+      results.push(...scanResults);
 
-        // Cache the result
-        if (!noCache) {
-          await cacheResult(file, result, standard);
+      // Add scan errors
+      for (const err of scanErrors) {
+        errors.push({ path: relative(absolutePath, err.path), error: err.error });
+      }
+
+      // Phase 3: Cache new results
+      if (!noCache) {
+        for (const result of scanResults) {
+          if (result.file) {
+            await cacheResult(result.file, result, standard);
+          }
         }
-      } catch (error) {
-        errors.push({ path: relPath, error: error instanceof Error ? error.message : String(error) });
       }
     }
 
@@ -353,58 +450,63 @@ async function scanFiles(
       scanSpinner.succeed(`Scanned ${results.length} files`);
     }
 
-    // Print any errors that occurred
-    for (const err of errors) {
-      printError(`Failed to scan ${err.path}: ${err.error}`);
-    }
-
-    console.log();
-    const scannedCount = results.length - skippedCount;
-    if (skippedCount > 0) {
-      printSuccess(`Scanned ${scannedCount} files (${skippedCount} skipped, unchanged)`);
-    } else {
-      printSuccess(`Scanned ${results.length} files`);
-    }
-
     // Create report
     const report = createReport(results);
 
-    // Print per-file results
-    console.log();
-    for (const result of results) {
-      if (!result.file) continue;
+    if (ci) {
+      // CI mode: only print summary line
+      printCiSummary(report.summary);
+    } else {
+      // Print any errors that occurred
+      for (const err of errors) {
+        printError(`Failed to scan ${err.path}: ${err.error}`);
+      }
 
-      const relPath = relative(absolutePath, result.file);
-      // Pass absolute path for clickable hyperlinks
-      printFileHeader(relPath, result.violations.length, result.file);
+      console.log();
+      const scannedCount = results.length - skippedCount;
+      if (skippedCount > 0) {
+        printSuccess(`Scanned ${scannedCount} files (${skippedCount} skipped, unchanged)`);
+      } else {
+        printSuccess(`Scanned ${results.length} files`);
+      }
 
-      if (result.violations.length > 0) {
-        for (const violation of result.violations) {
-          if (verbose || violation.impact === 'critical' || violation.impact === 'serious') {
-            printViolation(violation, relPath, result.file);
+      // Print per-file results
+      console.log();
+      for (const result of results) {
+        if (!result.file) continue;
+
+        const relPath = relative(absolutePath, result.file);
+        // Pass absolute path for clickable hyperlinks
+        printFileHeader(relPath, result.violations.length, result.file);
+
+        if (result.violations.length > 0) {
+          for (const violation of result.violations) {
+            if (verbose || violation.impact === 'critical' || violation.impact === 'serious') {
+              printViolation(violation, relPath, result.file);
+            }
           }
         }
       }
-    }
 
-    // Print summary
-    printSummary(report.summary);
+      // Print summary
+      printSummary(report.summary);
 
-    // Save report
-    await saveReport(report, outputDir, format);
+      // Save report
+      await saveReport(report, outputDir, format);
 
-    // Output to stdout if requested
-    if (format === 'sarif') {
-      const sarifReport = convertToSarif(report);
-      console.log(JSON.stringify(sarifReport, null, 2));
-    } else if (format === 'junit') {
-      const junitReport = convertToJunit(report);
-      console.log(junitReport);
-    } else if (format === 'csv') {
-      const csvReport = convertToCsv(report);
-      console.log(csvReport);
-    } else if (json) {
-      console.log(JSON.stringify(report, null, 2));
+      // Output to stdout if requested
+      if (format === 'sarif') {
+        const sarifReport = convertToSarif(report);
+        console.log(JSON.stringify(sarifReport, null, 2));
+      } else if (format === 'junit') {
+        const junitReport = convertToJunit(report);
+        console.log(junitReport);
+      } else if (format === 'csv') {
+        const csvReport = convertToCsv(report);
+        console.log(csvReport);
+      } else if (json) {
+        console.log(JSON.stringify(report, null, 2));
+      }
     }
 
     return report;
@@ -422,12 +524,6 @@ async function scanFiles(
   }
 }
 
-interface HistoryEntry {
-  date: string;
-  score: number;
-  violations: number;
-  files: number;
-}
 
 /**
  * Map axe-core severity to SARIF level
@@ -658,7 +754,8 @@ function convertToCsv(report: AllyReport): string {
 async function saveReport(
   report: AllyReport,
   outputDir: string,
-  format?: OutputFormat
+  format?: OutputFormat,
+  ci: boolean = false
 ): Promise<void> {
   try {
     // Ensure output directory exists
@@ -689,41 +786,23 @@ async function saveReport(
       printSuccess(`CSV report saved to ${csvPath}`);
     }
 
-    // Update history for progress tracking
-    await updateHistory(outputDir, report);
+    // Update history for progress tracking (skip in CI mode to avoid cluttering history)
+    if (!ci) {
+      await updateHistory(report);
+    }
   } catch (error) {
     printError(`Failed to save report: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
-async function updateHistory(outputDir: string, report: AllyReport): Promise<void> {
-  const historyPath = resolve(outputDir, 'history.json');
-  let history: HistoryEntry[] = [];
-
-  // Load existing history
-  if (existsSync(historyPath)) {
-    try {
-      const content = await import('fs/promises').then(fs => fs.readFile(historyPath, 'utf-8'));
-      history = JSON.parse(content);
-    } catch {
-      history = [];
-    }
-  }
-
-  // Add new entry (limit to last 30 entries)
-  const entry: HistoryEntry = {
-    date: new Date().toISOString(),
-    score: report.summary.score,
-    violations: report.summary.totalViolations,
-    files: report.totalFiles,
-  };
-
-  history.push(entry);
-  if (history.length > 30) {
-    history = history.slice(-30);
-  }
-
-  await writeFile(historyPath, JSON.stringify(history, null, 2));
+async function updateHistory(report: AllyReport): Promise<void> {
+  const projectPath = resolve('.');
+  const entry = createHistoryEntry(
+    report.summary.score,
+    report.summary.bySeverity,
+    report.totalFiles
+  );
+  await saveHistoryEntry(projectPath, entry);
 }
 
 export default scanCommand;

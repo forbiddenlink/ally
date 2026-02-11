@@ -28,7 +28,8 @@ async function setupPreCommitHooks(cwd: string, force: boolean, createdFiles: st
 
   // Pre-commit hook script content
   const preCommitScript = `#!/bin/sh
-ally scan --ci --threshold 0
+# Accessibility check - block commits with a11y errors
+npx ally-a11y scan src/ --ci --fail-on error
 `;
 
   // Pre-commit config YAML content
@@ -37,7 +38,7 @@ ally scan --ci --threshold 0
     hooks:
       - id: ally-scan
         name: Accessibility Check
-        entry: npx ally scan --ci --threshold 0
+        entry: npx ally-a11y scan src/ --ci --fail-on error
         language: system
         types: [html]
         pass_filenames: false

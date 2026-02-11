@@ -1,13 +1,22 @@
 /**
- * Accessibility scanner using axe-core and Puppeteer
+ * Accessibility scanner using axe-core with Puppeteer or Playwright
  */
 
 import puppeteer, { type Browser, type Page } from 'puppeteer';
 import { AxePuppeteer } from '@axe-core/puppeteer';
+import axe from 'axe-core';
 import { glob } from 'glob';
-import { readFile } from 'fs/promises';
-import { resolve, extname } from 'path';
+import { resolve } from 'path';
 import type { ScanResult, Violation, Severity, AllyReport, ReportSummary } from '../types/index.js';
+import {
+  createBrowser,
+  type BrowserAdapter,
+  type PageAdapter,
+  type BrowserType,
+} from './browser.js';
+
+// Re-export BrowserType for use in commands
+export type { BrowserType } from './browser.js';
 
 const SUPPORTED_EXTENSIONS = ['.html', '.htm'];
 const COMPONENT_EXTENSIONS = ['.jsx', '.tsx', '.vue', '.svelte'];
@@ -90,157 +99,406 @@ const COLOR_BLINDNESS_FILTERS: Record<ColorBlindnessType, string> = {
 /** Default page load timeout in milliseconds */
 export const DEFAULT_TIMEOUT = 30000;
 
+/** Default batch size for parallel scanning */
+export const DEFAULT_BATCH_SIZE = 4;
+
+/**
+ * Split an array into chunks of a specified size
+ */
+function chunk<T>(arr: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, i * size + size)
+  );
+}
+
+/**
+ * Result from parallel scanning - includes file path for error tracking
+ */
+export interface ParallelScanResult {
+  result?: ScanResult;
+  error?: { path: string; error: string };
+}
+
+/**
+ * Callback for progress updates during parallel scanning
+ */
+export type ScanProgressCallback = (completed: number, total: number, currentFile?: string) => void;
+
+/**
+ * axe-core result types for type safety
+ */
+interface AxeResults {
+  violations: Array<{
+    id: string;
+    impact?: string;
+    description: string;
+    help: string;
+    helpUrl: string;
+    tags: string[];
+    nodes: Array<{
+      html: string;
+      target: Array<string | string[]>;
+      failureSummary?: string;
+    }>;
+  }>;
+  passes: unknown[];
+  incomplete: unknown[];
+}
+
+/**
+ * Run axe-core analysis on a Playwright page by injecting axe-core source
+ */
+async function runAxeOnPlaywrightPage(page: PageAdapter, tags: string[]): Promise<AxeResults> {
+  // Get axe-core source code
+  const axeSource = axe.source;
+
+  // Get underlying page for direct evaluate access
+  const underlyingPage = page.getUnderlyingPage() as {
+    evaluate: <T>(fn: string | ((arg: unknown) => T), arg?: unknown) => Promise<T>;
+  };
+
+  // Inject axe-core source
+  await underlyingPage.evaluate(axeSource);
+
+  // Run axe with tags - pass tags as a single argument object
+  const axeResults = await underlyingPage.evaluate((runTags) => {
+    const tagsArray = runTags as string[];
+    return (window as unknown as { axe: { run: (options: { runOnly: { type: string; values: string[] } }) => Promise<unknown> } }).axe.run({
+      runOnly: {
+        type: 'tag',
+        values: tagsArray,
+      },
+    });
+  }, tags);
+
+  return axeResults as AxeResults;
+}
+
+/**
+ * Convert axe results to our Violation format
+ */
+function convertAxeResults(results: AxeResults): {
+  violations: Violation[];
+  passes: number;
+  incomplete: number;
+} {
+  const violations: Violation[] = results.violations.map((v) => ({
+    id: v.id,
+    impact: (v.impact || 'minor') as Severity,
+    description: v.description,
+    help: v.help,
+    helpUrl: v.helpUrl,
+    tags: v.tags,
+    nodes: v.nodes.map((n) => ({
+      html: n.html,
+      target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
+      failureSummary: n.failureSummary || '',
+    })),
+  }));
+
+  return {
+    violations,
+    passes: results.passes.length,
+    incomplete: results.incomplete.length,
+  };
+}
+
 export class AccessibilityScanner {
   private browser: Browser | null = null;
+  private browserAdapter: BrowserAdapter | null = null;
   private timeout: number;
+  private browserType: BrowserType;
+  private usePlaywright: boolean;
 
-  constructor(timeout: number = DEFAULT_TIMEOUT) {
+  constructor(timeout: number = DEFAULT_TIMEOUT, browserType: BrowserType = 'chromium') {
     this.timeout = timeout;
+    this.browserType = browserType;
+    // Use Playwright for Firefox and WebKit, Puppeteer for Chromium (default)
+    this.usePlaywright = browserType !== 'chromium';
   }
 
   async init(): Promise<void> {
-    this.browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    if (this.usePlaywright) {
+      // Use browser abstraction for Playwright browsers
+      this.browserAdapter = createBrowser(this.browserType);
+      await this.browserAdapter.launch();
+    } else {
+      // Use Puppeteer directly for Chromium (faster, always available)
+      this.browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+    }
   }
 
   async close(): Promise<void> {
+    if (this.browserAdapter) {
+      await this.browserAdapter.close();
+      this.browserAdapter = null;
+    }
     if (this.browser) {
       await this.browser.close();
       this.browser = null;
     }
   }
 
+  /**
+   * Get the browser type being used
+   */
+  getBrowserType(): BrowserType {
+    return this.browserType;
+  }
+
   async scanHtmlFile(filePath: string, standard: WcagStandard = DEFAULT_STANDARD): Promise<ScanResult> {
-    if (!this.browser) {
+    const absolutePath = resolve(filePath);
+    const fileUrl = `file://${absolutePath}`;
+    const tags = standardToTags[standard];
+
+    if (this.usePlaywright && this.browserAdapter) {
+      // Playwright path
+      const page = await this.browserAdapter.newPage();
+      try {
+        await page.goto(fileUrl, { waitUntil: 'load', timeout: this.timeout });
+        await page.waitForSelector('body');
+
+        const results = await runAxeOnPlaywrightPage(page, tags);
+        const { violations, passes, incomplete } = convertAxeResults(results);
+
+        return {
+          url: fileUrl,
+          file: filePath,
+          timestamp: new Date().toISOString(),
+          violations,
+          passes,
+          incomplete,
+        };
+      } finally {
+        await page.close();
+      }
+    } else if (this.browser) {
+      // Puppeteer path
+      const page = await this.browser.newPage();
+      try {
+        await page.goto(fileUrl, { waitUntil: 'load', timeout: this.timeout });
+        await page.waitForSelector('body');
+
+        const results = await new AxePuppeteer(page)
+          .withTags(tags)
+          .analyze();
+
+        const violations: Violation[] = results.violations.map((v) => ({
+          id: v.id,
+          impact: (v.impact || 'minor') as Severity,
+          description: v.description,
+          help: v.help,
+          helpUrl: v.helpUrl,
+          tags: v.tags,
+          nodes: v.nodes.map((n) => ({
+            html: n.html,
+            target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
+            failureSummary: n.failureSummary || '',
+          })),
+        }));
+
+        return {
+          url: fileUrl,
+          file: filePath,
+          timestamp: new Date().toISOString(),
+          violations,
+          passes: results.passes.length,
+          incomplete: results.incomplete.length,
+        };
+      } finally {
+        await page.close();
+      }
+    } else {
       throw new Error('Scanner not initialized. Call init() first.');
-    }
-
-    const page = await this.browser.newPage();
-
-    try {
-      const absolutePath = resolve(filePath);
-      const fileUrl = `file://${absolutePath}`;
-
-      await page.goto(fileUrl, { waitUntil: 'load', timeout: this.timeout });
-
-      // Wait for page to be ready
-      await page.waitForSelector('body');
-
-      const tags = standardToTags[standard];
-      const results = await new AxePuppeteer(page)
-        .withTags(tags)
-        .analyze();
-
-      const violations: Violation[] = results.violations.map((v) => ({
-        id: v.id,
-        impact: (v.impact || 'minor') as Severity,
-        description: v.description,
-        help: v.help,
-        helpUrl: v.helpUrl,
-        tags: v.tags,
-        nodes: v.nodes.map((n) => ({
-          html: n.html,
-          target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
-          failureSummary: n.failureSummary || '',
-        })),
-      }));
-
-      return {
-        url: fileUrl,
-        file: filePath,
-        timestamp: new Date().toISOString(),
-        violations,
-        passes: results.passes.length,
-        incomplete: results.incomplete.length,
-      };
-    } finally {
-      await page.close();
     }
   }
 
   async scanUrl(url: string, standard: WcagStandard = DEFAULT_STANDARD): Promise<ScanResult> {
-    if (!this.browser) {
+    const tags = standardToTags[standard];
+
+    if (this.usePlaywright && this.browserAdapter) {
+      // Playwright path
+      const page = await this.browserAdapter.newPage();
+      try {
+        await page.goto(url, { waitUntil: 'networkidle', timeout: this.timeout });
+
+        const results = await runAxeOnPlaywrightPage(page, tags);
+        const { violations, passes, incomplete } = convertAxeResults(results);
+
+        return {
+          url,
+          timestamp: new Date().toISOString(),
+          violations,
+          passes,
+          incomplete,
+        };
+      } finally {
+        await page.close();
+      }
+    } else if (this.browser) {
+      // Puppeteer path
+      const page = await this.browser.newPage();
+      try {
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: this.timeout });
+
+        const results = await new AxePuppeteer(page)
+          .withTags(tags)
+          .analyze();
+
+        const violations: Violation[] = results.violations.map((v) => ({
+          id: v.id,
+          impact: (v.impact || 'minor') as Severity,
+          description: v.description,
+          help: v.help,
+          helpUrl: v.helpUrl,
+          tags: v.tags,
+          nodes: v.nodes.map((n) => ({
+            html: n.html,
+            target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
+            failureSummary: n.failureSummary || '',
+          })),
+        }));
+
+        return {
+          url,
+          timestamp: new Date().toISOString(),
+          violations,
+          passes: results.passes.length,
+          incomplete: results.incomplete.length,
+        };
+      } finally {
+        await page.close();
+      }
+    } else {
       throw new Error('Scanner not initialized. Call init() first.');
-    }
-
-    const page = await this.browser.newPage();
-
-    try {
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: this.timeout });
-
-      const tags = standardToTags[standard];
-      const results = await new AxePuppeteer(page)
-        .withTags(tags)
-        .analyze();
-
-      const violations: Violation[] = results.violations.map((v) => ({
-        id: v.id,
-        impact: (v.impact || 'minor') as Severity,
-        description: v.description,
-        help: v.help,
-        helpUrl: v.helpUrl,
-        tags: v.tags,
-        nodes: v.nodes.map((n) => ({
-          html: n.html,
-          target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
-          failureSummary: n.failureSummary || '',
-        })),
-      }));
-
-      return {
-        url,
-        timestamp: new Date().toISOString(),
-        violations,
-        passes: results.passes.length,
-        incomplete: results.incomplete.length,
-      };
-    } finally {
-      await page.close();
     }
   }
 
   async scanHtmlString(html: string, identifier: string = 'inline', standard: WcagStandard = DEFAULT_STANDARD): Promise<ScanResult> {
-    if (!this.browser) {
+    const tags = standardToTags[standard];
+
+    if (this.usePlaywright && this.browserAdapter) {
+      // Playwright path
+      const page = await this.browserAdapter.newPage();
+      try {
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
+
+        const results = await runAxeOnPlaywrightPage(page, tags);
+        const { violations, passes, incomplete } = convertAxeResults(results);
+
+        return {
+          url: identifier,
+          file: identifier,
+          timestamp: new Date().toISOString(),
+          violations,
+          passes,
+          incomplete,
+        };
+      } finally {
+        await page.close();
+      }
+    } else if (this.browser) {
+      // Puppeteer path
+      const page = await this.browser.newPage();
+      try {
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
+
+        const results = await new AxePuppeteer(page)
+          .withTags(tags)
+          .analyze();
+
+        const violations: Violation[] = results.violations.map((v) => ({
+          id: v.id,
+          impact: (v.impact || 'minor') as Severity,
+          description: v.description,
+          help: v.help,
+          helpUrl: v.helpUrl,
+          tags: v.tags,
+          nodes: v.nodes.map((n) => ({
+            html: n.html,
+            target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
+            failureSummary: n.failureSummary || '',
+          })),
+        }));
+
+        return {
+          url: identifier,
+          file: identifier,
+          timestamp: new Date().toISOString(),
+          violations,
+          passes: results.passes.length,
+          incomplete: results.incomplete.length,
+        };
+      } finally {
+        await page.close();
+      }
+    } else {
+      throw new Error('Scanner not initialized. Call init() first.');
+    }
+  }
+
+  /**
+   * Scan multiple HTML files in parallel batches for improved performance
+   * @param files Array of file paths to scan
+   * @param standard WCAG standard to use for scanning
+   * @param batchSize Number of files to scan concurrently (default: 4)
+   * @param onProgress Optional callback for progress updates
+   * @returns Array of scan results (successful) and errors (failed)
+   */
+  async scanHtmlFilesParallel(
+    files: string[],
+    standard: WcagStandard = DEFAULT_STANDARD,
+    batchSize: number = DEFAULT_BATCH_SIZE,
+    onProgress?: ScanProgressCallback
+  ): Promise<{ results: ScanResult[]; errors: Array<{ path: string; error: string }> }> {
+    if (!this.browser && !this.browserAdapter) {
       throw new Error('Scanner not initialized. Call init() first.');
     }
 
-    const page = await this.browser.newPage();
+    const results: ScanResult[] = [];
+    const errors: Array<{ path: string; error: string }> = [];
+    const batches = chunk(files, batchSize);
+    let completedCount = 0;
 
-    try {
-      await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    for (const batch of batches) {
+      // Scan files in this batch concurrently
+      const batchPromises = batch.map(async (file): Promise<ParallelScanResult> => {
+        try {
+          const result = await this.scanHtmlFile(file, standard);
+          return { result };
+        } catch (error) {
+          return {
+            error: {
+              path: file,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          };
+        }
+      });
 
-      const tags = standardToTags[standard];
-      const results = await new AxePuppeteer(page)
-        .withTags(tags)
-        .analyze();
+      // Wait for all files in the batch to complete
+      const batchResults = await Promise.all(batchPromises);
 
-      const violations: Violation[] = results.violations.map((v) => ({
-        id: v.id,
-        impact: (v.impact || 'minor') as Severity,
-        description: v.description,
-        help: v.help,
-        helpUrl: v.helpUrl,
-        tags: v.tags,
-        nodes: v.nodes.map((n) => ({
-          html: n.html,
-          target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
-          failureSummary: n.failureSummary || '',
-        })),
-      }));
+      // Aggregate results and errors
+      for (const item of batchResults) {
+        if (item.result) {
+          results.push(item.result);
+        } else if (item.error) {
+          errors.push(item.error);
+        }
+        completedCount++;
 
-      return {
-        url: identifier,
-        file: identifier,
-        timestamp: new Date().toISOString(),
-        violations,
-        passes: results.passes.length,
-        incomplete: results.incomplete.length,
-      };
-    } finally {
-      await page.close();
+        // Report progress after each file completes
+        if (onProgress) {
+          onProgress(completedCount, files.length, item.result?.file || item.error?.path);
+        }
+      }
     }
+
+    return { results, errors };
   }
 
   /**
@@ -251,52 +509,68 @@ export class AccessibilityScanner {
     type: ColorBlindnessType,
     outputPath: string
   ): Promise<void> {
-    if (!this.browser) {
+    if (this.usePlaywright && this.browserAdapter) {
+      // Playwright path
+      const page = await this.browserAdapter.newPage();
+      try {
+        await page.setViewport({ width: 1280, height: 800 });
+        await page.goto(url, { waitUntil: 'networkidle', timeout: this.timeout });
+
+        const svgFilter = COLOR_BLINDNESS_FILTERS[type];
+        await page.addStyleTag({
+          content: `
+            html::before {
+              content: '';
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 0;
+              height: 0;
+              background-image: url('data:image/svg+xml,${encodeURIComponent(svgFilter.trim())}');
+            }
+            html {
+              filter: url('data:image/svg+xml,${encodeURIComponent(svgFilter.trim())}#${type}');
+            }
+          `,
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await page.screenshot({ path: outputPath, fullPage: true });
+      } finally {
+        await page.close();
+      }
+    } else if (this.browser) {
+      // Puppeteer path
+      const page = await this.browser.newPage();
+      try {
+        await page.setViewport({ width: 1280, height: 800 });
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: this.timeout });
+
+        const svgFilter = COLOR_BLINDNESS_FILTERS[type];
+        await page.addStyleTag({
+          content: `
+            html::before {
+              content: '';
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 0;
+              height: 0;
+              background-image: url('data:image/svg+xml,${encodeURIComponent(svgFilter.trim())}');
+            }
+            html {
+              filter: url('data:image/svg+xml,${encodeURIComponent(svgFilter.trim())}#${type}');
+            }
+          `,
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await page.screenshot({ path: outputPath, fullPage: true });
+      } finally {
+        await page.close();
+      }
+    } else {
       throw new Error('Scanner not initialized. Call init() first.');
-    }
-
-    const page = await this.browser.newPage();
-
-    try {
-      // Set a reasonable viewport size
-      await page.setViewport({ width: 1280, height: 800 });
-
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: this.timeout });
-
-      // Get the SVG filter for the specified color blindness type
-      const svgFilter = COLOR_BLINDNESS_FILTERS[type];
-
-      // Inject the SVG filter and apply it to the entire page
-      await page.addStyleTag({
-        content: `
-          /* Inject SVG filter as data URI */
-          html::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 0;
-            height: 0;
-            background-image: url('data:image/svg+xml,${encodeURIComponent(svgFilter.trim())}');
-          }
-
-          /* Apply filter to the entire page */
-          html {
-            filter: url('data:image/svg+xml,${encodeURIComponent(svgFilter.trim())}#${type}');
-          }
-        `,
-      });
-
-      // Give the filter a moment to apply
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Take screenshot
-      await page.screenshot({
-        path: outputPath,
-        fullPage: true,
-      });
-    } finally {
-      await page.close();
     }
   }
 }

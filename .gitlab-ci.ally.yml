@@ -1,0 +1,20 @@
+# GitLab CI template for ally accessibility testing
+# Include in your .gitlab-ci.yml: include: '.gitlab-ci.ally.yml'
+
+accessibility:
+  stage: test
+  image: node:20
+  before_script:
+    - npm ci
+  script:
+    - npx ally-a11y scan ./src --format sarif --output a11y-report.sarif
+    - npx ally-a11y scan ./src --format junit --output a11y-report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: a11y-report.xml
+    paths:
+      - a11y-report.sarif
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
