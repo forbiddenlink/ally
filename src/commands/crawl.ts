@@ -79,6 +79,19 @@ function isValidPageUrl(url: string): boolean {
       return false;
     }
 
+    // Block localhost and private IPs for security (except for explicit localhost scans)
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      // Block private IP ranges (10.x, 172.16-31.x, 192.168.x)
+      const ipMatch = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+      if (ipMatch) {
+        const [, a, b] = ipMatch.map(Number);
+        if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) {
+          return false;
+        }
+      }
+    }
+
     // Skip common non-page extensions
     const skipExtensions = [
       '.pdf', '.zip', '.tar', '.gz', '.rar',

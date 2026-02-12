@@ -8,6 +8,7 @@
 
 import { Command } from 'commander';
 import { createRequire } from 'module';
+import { handleErrorWithEnhancement } from './utils/enhanced-errors.js';
 
 // Read version from package.json to stay in sync
 const require = createRequire(import.meta.url);
@@ -123,7 +124,11 @@ program
         }
       }
     } catch (error) {
-      console.error('Scan failed:', error);
+      if (error instanceof Error) {
+        handleErrorWithEnhancement(error);
+      } else {
+        console.error('Scan failed:', error);
+      }
       process.exit(1);
     }
   });
@@ -214,6 +219,24 @@ program
     }
   });
 
+// ally history
+program
+  .command('history')
+  .description('View scan history and progress over time')
+  .option('-l, --limit <number>', 'Number of recent scans to show', '10')
+  .option('-b, --branch <name>', 'Filter by git branch')
+  .option('-v, --verbose', 'Show detailed information')
+  .action(async (options) => {
+    try {
+      const { historyCommand } = await import('./commands/history.js');
+      const limit = parseInt(options.limit, 10);
+      await historyCommand({ limit, branch: options.branch, verbose: options.verbose });
+    } catch (error) {
+      console.error('History failed:', error);
+      process.exit(1);
+    }
+  });
+
 // ally badge
 program
   .command('badge')
@@ -236,6 +259,7 @@ program
   .description('Watch for file changes and run accessibility scans continuously')
   .option('-d, --debounce <ms>', 'Debounce time in milliseconds', '500')
   .option('--clear', 'Clear console between scans')
+  .option('--fix-on-save', 'Automatically apply high-confidence fixes (≥90%) when files change')
   .action(async (path: string | undefined, options) => {
     try {
       const debounce = parseInt(options.debounce, 10);

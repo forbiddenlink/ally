@@ -9,7 +9,9 @@
   "files": [
     "dist",
     "mcp-server/dist",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "ACCESSIBILITY.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -17,7 +19,11 @@
     "dev": "tsc -w",
     "start": "node dist/cli.js",
     "test": "node --test --import tsx test/*.test.ts",
-    "prepublishOnly": "npm run build:all"
+    "test:coverage": "npm test",
+    "lint": "tsc --noEmit",
+    "benchmark": "tsx benchmark/scan-speed.ts",
+    "prepublishOnly": "npm run build:all",
+    "postinstall": "node -e \"console.log('\\n✅ ally-a11y installed! Run \\x1b[36mally init\\x1b[0m to get started.\\n')\""
   },
   "keywords": [
     "accessibility",
@@ -41,6 +47,7 @@
   },
   "dependencies": {
     "@axe-core/puppeteer": "^4.10.0",
+    "@octokit/rest": "^22.0.1",
     "axe-core": "^4.10.0",
     "boxen": "^8.0.1",
     "chalk": "^5.4.1",
@@ -49,7 +56,8 @@
     "glob": "^11.0.1",
     "inquirer": "^9.2.23",
     "ora": "^8.1.1",
-    "puppeteer": "^24.2.0"
+    "puppeteer": "^24.2.0",
+    "simple-git": "^3.30.0"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",
@@ -60,8 +68,5 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "optionalDependencies": {
-    "playwright": "^1.58.2"
   }
 }

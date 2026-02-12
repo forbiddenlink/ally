@@ -21,6 +21,18 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
+// Telemetry to track tool usage
+const telemetry = {
+  calls: new Map<string, number>(),
+  lastCalled: new Map<string, Date>(),
+  log(toolName: string) {
+    const count = this.calls.get(toolName) || 0;
+    this.calls.set(toolName, count + 1);
+    this.lastCalled.set(toolName, new Date());
+    console.error(`[MCP Telemetry] ${new Date().toISOString()} | ${toolName} called (${count + 1}x total)`);
+  }
+};
+
 // Cache for analyzed patterns
 const patternCache: Map<string, ComponentPattern[]> = new Map();
 const tokenCache: Map<string, DesignTokens> = new Map();
@@ -61,6 +73,7 @@ server.tool(
     component: z.string().optional().describe("Specific component name to analyze"),
   },
   async ({ directory, component }) => {
+    telemetry.log('get_component_patterns');
     const targetDir = directory || process.cwd();
 
     try {
@@ -120,6 +133,7 @@ server.tool(
     directory: z.string().optional().describe("Directory to search for design tokens"),
   },
   async ({ directory }) => {
+    telemetry.log('get_design_tokens');
     const targetDir = directory || process.cwd();
 
     try {
@@ -189,6 +203,7 @@ server.tool(
     issueType: z.string().optional().describe("Filter by issue type (e.g., 'image-alt', 'button-name')"),
   },
   async ({ issueType }) => {
+    telemetry.log('get_fix_history');
     try {
       const historyPath = join(process.cwd(), ".ally", "fix-history.json");
 
@@ -258,6 +273,7 @@ server.tool(
   "Get a summary of current accessibility issues from the latest scan",
   {},
   async () => {
+    telemetry.log('get_scan_summary');
     try {
       const scanPath = join(process.cwd(), ".ally", "scan.json");
 
@@ -1321,6 +1337,7 @@ server.tool(
     criterionId: z.string().describe("WCAG criterion like '1.1.1' or violation id like 'image-alt'"),
   },
   async ({ criterionId }) => {
+    telemetry.log('get_wcag_guideline');
     try {
       // Check if it's a violation ID first
       let wcagId = criterionId;
@@ -1399,6 +1416,7 @@ server.tool(
     componentType: z.string().describe("e.g., 'modal', 'tabs', 'menu', 'accordion'"),
   },
   async ({ componentType }) => {
+    telemetry.log('suggest_aria_pattern');
     try {
       // Normalize the component type
       const normalizedType = componentType.toLowerCase().trim();
@@ -1487,6 +1505,7 @@ server.tool(
     isBold: z.boolean().optional().describe("Whether text is bold (optional)"),
   },
   async ({ foreground, background, fontSize, isBold }) => {
+    telemetry.log('check_color_contrast');
     try {
       // Parse colors
       const fgColor = parseColor(foreground);

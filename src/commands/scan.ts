@@ -3,7 +3,7 @@
  */
 
 import { resolve, relative } from 'path';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, writeFile, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import cliProgress from 'cli-progress';
 import {
@@ -45,11 +45,20 @@ import {
   formatScanError,
   isPuppeteerError,
 } from '../utils/errors.js';
+import {
+  handleErrorWithEnhancement,
+  throwEnhancedError,
+} from '../utils/enhanced-errors.js';
 import { loadConfig, loadIgnorePatterns, type AllyConfig } from '../utils/config.js';
 import {
-  saveHistoryEntry,
-  createHistoryEntry,
-} from '../utils/history.js';
+  saveHistoryEntry as saveHistoryTracking,
+} from '../utils/history-tracking.js';
+import {
+  sortByImpact,
+  groupByImpact,
+  detectPageContext,
+  type ImpactScore,
+} from '../utils/impact-scores.js';
 import type { ScanResult, AllyReport, Violation, Severity } from '../types/index.js';
 
 /**
@@ -240,16 +249,23 @@ async function scanUrl(
 
     const report = createReport([result]);
 
+    // Save to history for progress tracking
+    await saveHistoryTracking(report, 'scan');
+
     if (ci) {
       // CI mode: only print summary line
       printCiSummary(report.summary);
     } else {
-      // Print violations
+      // Print violations sorted by impact
       if (result.violations.length > 0) {
         console.log();
-        for (const violation of result.violations) {
+        
+        // Sort violations by impact score
+        const sortedViolations = sortByImpact(result.violations);
+        
+        for (const { violation, impact } of sortedViolations) {
           if (verbose || violation.impact === 'critical' || violation.impact === 'serious') {
-            printViolation(violation);
+            printViolation(violation, undefined, undefined, impact);
           }
         }
       }
@@ -346,7 +362,7 @@ async function scanFiles(
       findSpinner.stop();
     }
     if (!ci) {
-      suggestUrl();
+      throwEnhancedError('NO_FILES_FOUND');
     }
     return null;
   }
@@ -453,6 +469,9 @@ async function scanFiles(
     // Create report
     const report = createReport(results);
 
+    // Save to history for progress tracking
+    await saveHistoryTracking(report, 'scan');
+
     if (ci) {
       // CI mode: only print summary line
       printCiSummary(report.summary);
@@ -470,7 +489,7 @@ async function scanFiles(
         printSuccess(`Scanned ${results.length} files`);
       }
 
-      // Print per-file results
+      // Print per-file results with impact scoring
       console.log();
       for (const result of results) {
         if (!result.file) continue;
@@ -480,9 +499,21 @@ async function scanFiles(
         printFileHeader(relPath, result.violations.length, result.file);
 
         if (result.violations.length > 0) {
-          for (const violation of result.violations) {
+          // Detect page context from file content
+          let pageContext = {};
+          try {
+            const fileContent = await readFile(result.file, 'utf-8');
+            pageContext = detectPageContext(fileContent);
+          } catch {
+            // If file read fails, use empty context
+          }
+          
+          // Sort violations by impact score
+          const sortedViolations = sortByImpact(result.violations, pageContext);
+          
+          for (const { violation, impact } of sortedViolations) {
             if (verbose || violation.impact === 'critical' || violation.impact === 'serious') {
-              printViolation(violation, relPath, result.file);
+              printViolation(violation, relPath, result.file, impact);
             }
           }
         }
@@ -786,23 +817,10 @@ async function saveReport(
       printSuccess(`CSV report saved to ${csvPath}`);
     }
 
-    // Update history for progress tracking (skip in CI mode to avoid cluttering history)
-    if (!ci) {
-      await updateHistory(report);
-    }
+    // Note: History tracking is now handled by saveHistoryTracking() after createReport()
   } catch (error) {
     printError(`Failed to save report: ${error instanceof Error ? error.message : String(error)}`);
   }
-}
-
-async function updateHistory(report: AllyReport): Promise<void> {
-  const projectPath = resolve('.');
-  const entry = createHistoryEntry(
-    report.summary.score,
-    report.summary.bySeverity,
-    report.totalFiles
-  );
-  await saveHistoryEntry(projectPath, entry);
 }
 
 export default scanCommand;

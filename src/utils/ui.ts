@@ -6,6 +6,7 @@ import chalk from 'chalk';
 import boxen from 'boxen';
 import ora, { type Ora } from 'ora';
 import type { Severity, ReportSummary, Violation } from '../types/index.js';
+import type { ImpactScore } from './impact-scores.js';
 
 // Honor NO_COLOR environment variable (https://no-color.org/)
 const noColor = process.env.NO_COLOR !== undefined || process.env.ALLY_NO_COLOR !== undefined;
@@ -113,12 +114,46 @@ export function createSpinner(text: string): Ora {
   });
 }
 
-export function printViolation(violation: Violation, file?: string, absolutePath?: string): void {
+export function printViolation(
+  violation: Violation,
+  file?: string,
+  absolutePath?: string,
+  impactScore?: ImpactScore
+): void {
   const color = severityColors[violation.impact];
   const icon = severityIcons[violation.impact];
 
-  console.log(color(`  [${icon}] ${violation.impact.toUpperCase()}`));
+  // Print severity and impact score on the same line
+  if (impactScore) {
+    const scoreColor = 
+      impactScore.score >= 95 ? chalk.red.bold :
+      impactScore.score >= 75 ? chalk.red :
+      impactScore.score >= 40 ? chalk.yellow :
+      chalk.blue;
+    
+    console.log(
+      color(`  [${icon}] ${violation.impact.toUpperCase()}`) +
+      scoreColor(` Impact: ${impactScore.score}/100`) +
+      chalk.dim(` (WCAG ${impactScore.wcagLevel})`)
+    );
+  } else {
+    console.log(color(`  [${icon}] ${violation.impact.toUpperCase()}`));
+  }
+  
   console.log(chalk.white(`      ${violation.help}`));
+
+  // Print impact reasoning if available
+  if (impactScore) {
+    console.log(chalk.dim(`      💡 ${impactScore.reasoning}`));
+    console.log(
+      chalk.dim(`      👥 Affects: `) +
+      chalk.cyan(impactScore.affectedUsers.join(', '))
+    );
+    console.log(
+      chalk.dim(`      📊 Estimated: `) +
+      chalk.cyan(impactScore.estimatedUsers)
+    );
+  }
 
   if (file) {
     // Use absolute path for the hyperlink if available, display relative path

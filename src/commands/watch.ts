@@ -7,7 +7,7 @@
 
 import { resolve, relative, extname } from 'path';
 import { watch, existsSync, statSync } from 'fs';
-import { readdir } from 'fs/promises';
+import { readdir, readFile, writeFile } from 'fs/promises';
 import chalk from 'chalk';
 import {
   AccessibilityScanner,
@@ -20,21 +20,65 @@ import {
   printSuccess,
   printWarning,
 } from '../utils/ui.js';
+import {
+  generateSuggestedFix,
+  getFixConfidence,
+  FIX_CONFIDENCE,
+} from '../utils/fix-patterns.js';
 import type { ScanResult, Violation, Severity } from '../types/index.js';
 
 interface WatchCommandOptions {
   port?: number;
   debounce?: number;
   clear?: boolean;
+  fixOnSave?: boolean;
 }
 
 interface WatchStats {
   filesScanned: number;
   totalViolations: number;
   cleanScans: number;
+  autoFixed: number;
 }
 
 const SUPPORTED_EXTENSIONS = ['.html', '.htm'];
+
+/**
+ * Auto-apply high-confidence fixes to a file
+ * Returns the number of fixes applied
+ */
+async function autoFixFile(
+  filePath: string,
+  violations: Violation[]
+): Promise<number> {
+  let content = await readFile(filePath, 'utf-8');
+  let fixesApplied = 0;
+
+  // Only apply high-confidence fixes (>= 0.9)
+  const highConfidenceViolations = violations.filter((v) => {
+    const confidence = getFixConfidence(v.id);
+    return confidence !== null && confidence >= 0.9;
+  });
+
+  for (const violation of highConfidenceViolations) {
+    for (const node of violation.nodes) {
+      if (node.html) {
+        const fixedHtml = generateSuggestedFix(violation, node.html);
+        if (fixedHtml && fixedHtml !== node.html) {
+          // Apply the fix by replacing the HTML
+          content = content.replace(node.html, fixedHtml);
+          fixesApplied++;
+        }
+      }
+    }
+  }
+
+  if (fixesApplied > 0) {
+    await writeFile(filePath, content, 'utf-8');
+  }
+
+  return fixesApplied;
+}
 
 /**
  * Format time for log output
@@ -94,7 +138,8 @@ function printCompactViolation(violation: Violation): void {
 function printWatchResult(
   file: string,
   result: ScanResult,
-  basePath: string
+  basePath: string,
+  fixesApplied?: number
 ): void {
   const relPath = relative(basePath, file);
   const score = calculateScore([result]);
@@ -102,6 +147,11 @@ function printWatchResult(
 
   console.log();
   console.log(`${formatTime()} ${chalk.bold(relPath)} changed`);
+
+  if (fixesApplied && fixesApplied > 0) {
+    const fixText = fixesApplied === 1 ? 'fix' : 'fixes';
+    console.log(chalk.green(`   ✓ Auto-applied ${fixesApplied} ${fixText}`));
+  }
 
   if (violations.length === 0) {
     console.log(chalk.green(`   No issues found (score: ${score})`));
@@ -151,6 +201,9 @@ function printWatchSummary(stats: WatchStats, startTime: Date): void {
   console.log(`  Files scanned:   ${stats.filesScanned}`);
   console.log(`  Total violations: ${stats.totalViolations}`);
   console.log(`  Clean scans:     ${stats.cleanScans}`);
+  if (stats.autoFixed > 0) {
+    console.log(chalk.green(`  Auto-fixed:      ${stats.autoFixed}`));
+  }
   console.log();
 }
 
@@ -233,7 +286,7 @@ export async function watchCommand(
   targetPath: string = '.',
   options: WatchCommandOptions = {}
 ): Promise<void> {
-  const { debounce: debounceMs = 500, clear = false } = options;
+  const { debounce: debounceMs = 500, clear = false, fixOnSave = false } = options;
 
   const absolutePath = resolve(targetPath);
 
@@ -254,6 +307,9 @@ export async function watchCommand(
   console.log(chalk.cyan.bold('Watching for accessibility changes...'));
   console.log(chalk.dim(`   Directory: ${absolutePath}`));
   console.log(chalk.dim(`   Debounce: ${debounceMs}ms`));
+  if (fixOnSave) {
+    console.log(chalk.green('   Auto-fix: ON (confidence ≥ 90%)'));
+  }
   console.log(chalk.dim('   Press Ctrl+C to stop\n'));
 
   // Initialize scanner
@@ -265,6 +321,7 @@ export async function watchCommand(
     filesScanned: 0,
     totalViolations: 0,
     cleanScans: 0,
+    autoFixed: 0,
   };
   const startTime = new Date();
 
@@ -284,6 +341,20 @@ export async function watchCommand(
       stats.totalViolations += result.violations.length;
       if (result.violations.length === 0) {
         stats.cleanScans++;
+      }
+
+      // Auto-fix if enabled
+      let fixesApplied = 0;
+      if (fixOnSave && result.violations.length > 0) {
+        fixesApplied = await autoFixFile(filePath, result.violations);
+        stats.autoFixed += fixesApplied;
+
+        // Rescan after fixes to show updated violations
+        if (fixesApplied > 0) {
+          const updatedResult = await scanner.scanHtmlFile(filePath);
+          printWatchResult(filePath, updatedResult, absolutePath, fixesApplied);
+          return;
+        }
       }
 
       printWatchResult(filePath, result, absolutePath);

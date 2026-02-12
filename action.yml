@@ -25,10 +25,13 @@ inputs:
 outputs:
   score:
     description: 'Accessibility score (0-100)'
+    value: ${{ steps.scan.outputs.score }}
   violations:
     description: 'Total number of violations found'
+    value: ${{ steps.scan.outputs.violations }}
   report:
     description: 'Path to the generated report'
+    value: ${{ steps.scan.outputs.report }}
 
 runs:
   using: 'composite'
