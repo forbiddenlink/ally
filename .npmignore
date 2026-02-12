@@ -1,0 +1,31 @@
+# Development files
+src/
+test/
+test-fixtures/
+thoughts/
+demo/
+*.test.ts
+tsconfig.json
+.gitignore
+.git
+
+# Build artifacts
+*.tsbuildinfo
+node_modules/
+
+# Documentation that shouldn't be in npm package
+DEV_POST.md
+test-report.md
+
+# Editor/IDE history
+.history/
+.claude/
+
+# Benchmark
+benchmark/
+
+# Code quality
+.codacy/
+
+# Integration docs (internal)
+COPILOT_INTEGRATION.md

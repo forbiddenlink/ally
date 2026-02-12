@@ -4,7 +4,7 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { resolve, dirname, basename } from 'path';
+import { resolve, dirname, basename, relative } from 'path';
 import chalk from 'chalk';
 import {
   printBanner,
@@ -215,7 +215,15 @@ function generateMarkdownReport(report: AllyReport): string {
     md += `|------|--------|\n`;
 
     for (const result of report.results) {
-      const fileName = result.file || result.url;
+      // Convert absolute paths to relative for cleaner reports
+      let fileName: string;
+      if (result.file) {
+        fileName = relative(process.cwd(), result.file) || result.file;
+      } else if (result.url) {
+        fileName = result.url;
+      } else {
+        fileName = 'unknown';
+      }
       const issueCount = result.violations.length;
       const icon = issueCount === 0 ? '✅' : issueCount < 5 ? '⚠️' : '❌';
       md += `| ${icon} ${fileName} | ${issueCount} |\n`;

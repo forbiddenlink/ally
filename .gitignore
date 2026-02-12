@@ -25,3 +25,13 @@ coverage/
 # Environment
 .env
 .env.local
+
+
+# Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+
+# Editor history
+.history/
+
+# Claude Code cache
+.claude/cache/
