@@ -19,11 +19,19 @@
     "dev": "tsc -w",
     "start": "node dist/cli.js",
     "test": "node --test --import tsx test/*.test.ts",
-    "test:coverage": "npm test",
+    "test:coverage": "c8 --reporter=text --reporter=lcov node --test --import tsx test/*.test.ts",
+    "test:coverage:check": "c8 check-coverage --lines 70 --functions 70 --branches 60",
+    "test:e2e": "node --test --import tsx test/e2e/*.test.ts",
     "lint": "tsc --noEmit",
     "benchmark": "tsx benchmark/scan-speed.ts",
+    "benchmark:ci": "tsx benchmark/scan-speed.ts --json --threshold 20",
     "prepublishOnly": "npm run build:all",
     "postinstall": "node -e \"console.log('\\n✅ ally-a11y installed! Run \\x1b[36mally init\\x1b[0m to get started.\\n')\""
+  },
+  "c8": {
+    "include": ["src/**/*.ts"],
+    "exclude": ["test/**", "dist/**", "mcp-server/**"],
+    "all": true
   },
   "keywords": [
     "accessibility",
@@ -63,6 +71,7 @@
     "@types/cli-progress": "^3.11.6",
     "@types/inquirer": "^9.0.9",
     "@types/node": "^22.13.4",
+    "c8": "^10.1.3",
     "tsx": "^4.21.0",
     "typescript": "^5.7.3"
   },

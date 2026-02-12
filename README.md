@@ -4,14 +4,27 @@
 
 [![npm version](https://img.shields.io/npm/v/ally-a11y)](https://www.npmjs.com/package/ally-a11y)
 [![CI](https://github.com/lizthegrey/ally/actions/workflows/ci.yml/badge.svg)](https://github.com/lizthegrey/ally/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/lizthegrey/ally/branch/main/graph/badge.svg)](https://codecov.io/gh/lizthegrey/ally)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
 ![Accessibility](https://img.shields.io/badge/a11y-first-blue)
-![Built with Copilot CLI](https://img.shields.io/badge/built%20with-Copilot%20CLI-purple)
 
 ---
 
-## 🚀 Two Features No Other Tool Has
+## Table of Contents
+
+- [Key Features](#two-features-no-other-tool-has)
+- [Quick Start](#installation)
+- [Commands](#commands)
+- [Configuration](#configuration)
+- [CI/CD Integration](#github-action)
+- [Why Ally?](#why-ally)
+- [FAQ](#faq)
+- [Contributing](#contributing)
+
+---
+
+## Two Features No Other Tool Has
 
 ### 1. Real-Time Auto-Fix (`watch --fix-on-save`)
 
@@ -65,18 +78,36 @@ $ ally scan ./src
 
 ## What It Does
 
-**Core commands:**
+**Core commands (19 total):**
 ```bash
-ally scan ./src          # Scans for violations with impact scores
-ally watch --fix-on-save # Auto-fixes issues as you save files
-ally history             # View progress over time with trends
+# Scanning
+ally scan ./src          # Scan for violations with impact scores
+ally watch --fix-on-save # Auto-fix issues as you save files
+ally crawl <url>         # Multi-page website scanning
+ally scan-storybook      # Scan Storybook components
+ally tree <url>          # View accessibility tree
+
+# Fixing & Learning
 ally fix                 # Interactive fix approval (35+ patterns)
 ally explain             # WCAG explanations + Copilot integration
-ally report              # Generate reports (MD/HTML/JSON/SARIF/JUnit/CSV)
+ally learn <violation>   # Educational deep-dive on violations
 ally triage              # Prioritize violations interactively
-ally crawl <url>         # Multi-page website scanning
+
+# Reporting & Progress
+ally report              # Generate reports (MD/HTML/JSON/SARIF/CSV)
+ally history             # View progress over time with trends
+ally stats               # Accessibility progress dashboard
+ally badge               # Generate score badges
 ally pr-check            # Post results to GitHub PRs
-ally badge               # Generate accessibility badges
+
+# Design Systems
+ally audit-palette       # Audit color palette for contrast
+
+# Setup & Diagnostics
+ally init                # Initialize ally in your project
+ally doctor              # Diagnose configuration issues
+ally health              # Quick accessibility health check
+ally completion          # Shell tab completion
 ``` 
 
 ---
@@ -487,6 +518,77 @@ ally pr-check --fail-on critical  # Fail CI on critical issues
 - Auto-detects PR number in GitHub Actions
 - Supports `--fail-on` for CI gates
 
+### `ally scan-storybook`
+
+Scan Storybook stories for accessibility issues. Automatically discovers and tests all stories.
+
+```bash
+ally scan-storybook                           # Scan localhost:6006
+ally scan-storybook -u http://localhost:9009  # Custom Storybook URL
+ally scan-storybook --filter "Button*"        # Filter stories by pattern
+ally scan-storybook -f json -o ./reports      # Output as JSON
+```
+
+**Options:**
+- `-u, --url` - Storybook URL (default: http://localhost:6006)
+- `-T, --timeout` - Page load timeout in ms (default: 10000)
+- `-f, --filter` - Filter stories by name pattern
+- `-F, --format` - Output format (default, json, csv)
+- `-s, --standard` - WCAG standard (default: wcag22aa)
+
+### `ally audit-palette`
+
+Audit a design system color palette for contrast issues. Supports JSON/CSS/SCSS palette files.
+
+```bash
+ally audit-palette colors.json              # Audit palette file
+ally audit-palette tokens.css --apca        # Include APCA contrast values
+ally audit-palette palette.scss --level aaa # Require AAA compliance
+ally audit-palette colors.json -f csv       # Output as CSV
+```
+
+**Options:**
+- `-f, --format` - Output format (default, json, csv)
+- `-l, --level` - Minimum WCAG level to pass (aa, aaa)
+- `--large-text` - Use large text thresholds (3:1 for AA)
+- `--apca` - Include APCA Lc values in output
+
+### `ally doctor`
+
+Diagnose installation and configuration issues. Run this if ally isn't working as expected.
+
+```bash
+ally doctor    # Check installation health
+```
+
+**Checks:**
+- Node.js version compatibility
+- Required dependencies installed
+- Browser automation setup (Puppeteer/Playwright)
+- Configuration file validity
+- MCP server connectivity
+
+### `ally health`
+
+Quick accessibility health check similar to `npm audit`. Get a fast overview of your project's accessibility status.
+
+```bash
+ally health                       # Quick scan with summary
+ally health -p ./src              # Scan specific path
+ally health -s wcag21aa           # Use specific standard
+ally health -i .ally/scan.json    # Use existing scan results
+```
+
+### `ally completion`
+
+Generate shell completion scripts for tab completion of commands and options.
+
+```bash
+ally completion bash >> ~/.bashrc    # Bash completion
+ally completion zsh >> ~/.zshrc      # Zsh completion
+ally completion fish > ~/.config/fish/completions/ally.fish
+```
+
 ## Configuration
 
 Ally supports configuration files. Create `.allyrc.json` in your project root:
@@ -628,6 +730,8 @@ Yes! Use the `--standard` flag to specify which WCAG level (A, AA, AAA) and vers
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+For understanding the codebase structure, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Security
 
 For security issues, see [SECURITY.md](SECURITY.md).
@@ -644,10 +748,6 @@ MIT © Liz Fong-Jones
 
 ---
 
-**Made with ♿️ by the accessibility community**
+**Made with care for the accessibility community**
 
 *Simplifying WCAG compliance, one fix at a time.*
-
----
-
-Built with [GitHub Copilot CLI](https://github.com/features/copilot/cli) for the [GitHub Copilot CLI Challenge](https://dev.to/challenges/github-2026-01-21).
