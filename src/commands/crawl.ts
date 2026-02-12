@@ -34,15 +34,6 @@ interface CrawlProgress {
   score: number;
 }
 
-/**
- * Extract all links from a page using Puppeteer
- */
-async function extractLinks(scanner: AccessibilityScanner, url: string): Promise<string[]> {
-  // Access the browser through the scanner's scanUrl method pattern
-  // We need to add a method to extract links, so we'll use a workaround
-  // by scanning and extracting links in one pass
-  return [];
-}
 
 /**
  * Normalize URL by removing hash and trailing slash
@@ -171,10 +162,6 @@ export async function crawlCommand(
   try {
     await scanner.init();
 
-    // Get browser page for link extraction
-    // We'll extract links during the scan process
-    const browser = (scanner as any).browser;
-
     while (toVisit.length > 0 && results.length < limit) {
       const next = toVisit.shift();
       if (!next) break;
@@ -234,33 +221,20 @@ export async function crawlCommand(
 
         // Extract links if we haven't reached max depth
         if (currentDepth < depth) {
-          const page = await browser.newPage();
-          try {
-            await page.goto(normalized, { waitUntil: 'networkidle2', timeout: 30000 });
+          const links = await scanner.extractLinks(normalized);
 
-            // Extract all anchor hrefs
-            const links: string[] = await page.evaluate(() => {
-              const anchors = document.querySelectorAll('a[href]');
-              return Array.from(anchors)
-                .map((a: Element) => (a as HTMLAnchorElement).href)
-                .filter((href: string) => href && !href.startsWith('javascript:'));
-            });
-
-            // Add new links to the queue
-            for (const link of links) {
-              const normalizedLink = normalizeUrl(link);
-              if (!visited.has(normalizedLink) && isValidPageUrl(normalizedLink)) {
-                if (!sameOrigin || isSameOrigin(normalizedStartUrl, normalizedLink)) {
-                  // Check if already in queue
-                  const alreadyQueued = toVisit.some(item => normalizeUrl(item.url) === normalizedLink);
-                  if (!alreadyQueued) {
-                    toVisit.push({ url: normalizedLink, depth: currentDepth + 1 });
-                  }
+          // Add new links to the queue
+          for (const link of links) {
+            const normalizedLink = normalizeUrl(link);
+            if (!visited.has(normalizedLink) && isValidPageUrl(normalizedLink)) {
+              if (!sameOrigin || isSameOrigin(normalizedStartUrl, normalizedLink)) {
+                // Check if already in queue
+                const alreadyQueued = toVisit.some(item => normalizeUrl(item.url) === normalizedLink);
+                if (!alreadyQueued) {
+                  toVisit.push({ url: normalizedLink, depth: currentDepth + 1 });
                 }
               }
             }
-          } finally {
-            await page.close();
           }
         }
       } catch (error) {

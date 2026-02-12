@@ -502,6 +502,42 @@ export class AccessibilityScanner {
   }
 
   /**
+   * Extract all anchor links from a URL
+   * This method provides type-safe access to browser pages for link extraction
+   */
+  async extractLinks(url: string): Promise<string[]> {
+    if (this.usePlaywright && this.browserAdapter) {
+      const page = await this.browserAdapter.newPage();
+      try {
+        await page.goto(url, { waitUntil: 'networkidle', timeout: this.timeout });
+        const underlyingPage = page.getUnderlyingPage() as {
+          evaluate: <T>(fn: () => T) => Promise<T>;
+        };
+        return await underlyingPage.evaluate(() => {
+          return Array.from(document.querySelectorAll('a[href]'))
+            .map(a => (a as HTMLAnchorElement).href)
+            .filter(href => href && !href.startsWith('javascript:'));
+        });
+      } finally {
+        await page.close();
+      }
+    } else if (this.browser) {
+      const page = await this.browser.newPage();
+      try {
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: this.timeout });
+        return await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('a[href]'))
+            .map(a => (a as HTMLAnchorElement).href)
+            .filter(href => href && !href.startsWith('javascript:'));
+        });
+      } finally {
+        await page.close();
+      }
+    }
+    return [];
+  }
+
+  /**
    * Take a screenshot of a URL with color blindness simulation applied
    */
   async simulateColorBlindness(
