@@ -3,8 +3,8 @@
 > **The only accessibility CLI with real-time auto-fix and impact scoring.**
 
 [![npm version](https://img.shields.io/npm/v/ally-a11y)](https://www.npmjs.com/package/ally-a11y)
-[![CI](https://github.com/lizthegrey/ally/actions/workflows/ci.yml/badge.svg)](https://github.com/lizthegrey/ally/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/lizthegrey/ally/branch/main/graph/badge.svg)](https://codecov.io/gh/lizthegrey/ally)
+[![CI](https://github.com/forbiddenlink/ally/actions/workflows/ci.yml/badge.svg)](https://github.com/forbiddenlink/ally/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/forbiddenlink/ally/branch/main/graph/badge.svg)](https://codecov.io/gh/forbiddenlink/ally)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
 ![Accessibility](https://img.shields.io/badge/a11y-first-blue)
@@ -675,7 +675,7 @@ Ally includes a custom MCP server that provides project-specific context to Copi
 Use ally in your CI/CD pipeline with our official GitHub Action:
 
 ```yaml
-- uses: lizthegrey/ally@v1
+- uses: forbiddenlink/ally@v1
   with:
     path: ./src
     threshold: 0              # Fail if any violations

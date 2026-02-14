@@ -53,7 +53,7 @@ When using ally:
 When using the GitHub Action:
 
 ```yaml
-- uses: lizthegrey/ally@v1
+- uses: forbiddenlink/ally@v1
   with:
     path: ./src
     threshold: 0

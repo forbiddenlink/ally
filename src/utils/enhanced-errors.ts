@@ -33,7 +33,7 @@ export const ERROR_MESSAGES: Record<string, EnhancedError> = {
       '4. Or scan your dev server: `ally scan --url http://localhost:3000`',
     ],
     example: '# For Next.js apps\nnpm run build\nally scan .next/\n\n# Or scan live dev server\nally scan --url http://localhost:3000',
-    docs: 'https://github.com/lizthegrey/ally#scanning-frameworks',
+    docs: 'https://github.com/forbiddenlink/ally#scanning-frameworks',
     tip: 'Most modern frameworks generate HTML at build time or runtime - scan the output, not source!',
   },
 
@@ -61,7 +61,7 @@ export const ERROR_MESSAGES: Record<string, EnhancedError> = {
       '4. For local dev servers, ensure they\'re running before scanning',
     ],
     example: '# Increase timeout for slow pages\nally scan --url https://example.com --timeout 60000\n\n# Start dev server first\nnpm run dev &\nsleep 5\nally scan --url http://localhost:3000',
-    docs: 'https://github.com/lizthegrey/ally#troubleshooting',
+    docs: 'https://github.com/forbiddenlink/ally#troubleshooting',
     tip: 'Large pages or slow connections? Try scanning individual routes instead of the homepage.',
   },
 
@@ -89,7 +89,7 @@ export const ERROR_MESSAGES: Record<string, EnhancedError> = {
       '4. Delete config to reset: `rm .allyrc.json && ally init`',
     ],
     example: '// Valid .allyrc.json\n{\n  "scan": {\n    "standard": "wcag22aa",\n    "threshold": 5\n  },\n  "fix": {\n    "autoApprove": ["image-alt"]\n  }\n}',
-    docs: 'https://github.com/lizthegrey/ally#configuration',
+    docs: 'https://github.com/forbiddenlink/ally#configuration',
     tip: 'Use `ally init` to create a valid config file with sensible defaults.',
   },
 
@@ -131,7 +131,7 @@ export const ERROR_MESSAGES: Record<string, EnhancedError> = {
       '4. Scan in batches: `ally scan ./src/a* && ally scan ./src/b*`',
     ],
     example: '# Increase Node memory limit\nNODE_OPTIONS="--max-old-space-size=4096" ally scan ./src\n\n# Create .allyignore\necho "node_modules/" > .allyignore\necho "dist/" >> .allyignore\necho "coverage/" >> .allyignore',
-    docs: 'https://github.com/lizthegrey/ally#ignore-patterns',
+    docs: 'https://github.com/forbiddenlink/ally#ignore-patterns',
     tip: 'Scanning node_modules? Add it to .allyignore to skip dependency files!',
   },
 
@@ -158,7 +158,7 @@ export const ERROR_MESSAGES: Record<string, EnhancedError> = {
       '4. Verify repo access: `gh pr list`',
     ],
     example: '# GitHub Actions workflow\n- name: Check PR\n  env:\n    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n  run: ally pr-check',
-    docs: 'https://github.com/lizthegrey/ally#github-actions',
+    docs: 'https://github.com/forbiddenlink/ally#github-actions',
     tip: 'Local testing? Use `ally pr-check --pr 123` to specify the PR number.',
   },
 

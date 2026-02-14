@@ -771,7 +771,7 @@ function convertToSarif(report: AllyReport): SarifReport {
           driver: {
             name: 'ally',
             version: '1.0.0',
-            informationUri: 'https://github.com/lizthegrey/ally',
+            informationUri: 'https://github.com/forbiddenlink/ally',
             rules,
           },
         },

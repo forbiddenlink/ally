@@ -360,7 +360,7 @@ npm install -g ally-a11y
 
 ### On-Screen Text (add in post)
 ```
-github.com/lizthegrey/ally
+github.com/forbiddenlink/ally
 npm install -g ally-a11y
 
 Make the web accessible for everyone.

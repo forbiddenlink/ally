@@ -54,11 +54,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lizthegrey/ally.git"
+    "url": "https://github.com/forbiddenlink/ally.git"
   },
-  "homepage": "https://github.com/lizthegrey/ally#readme",
+  "homepage": "https://github.com/forbiddenlink/ally#readme",
   "bugs": {
-    "url": "https://github.com/lizthegrey/ally/issues"
+    "url": "https://github.com/forbiddenlink/ally/issues"
   },
   "dependencies": {
     "@axe-core/puppeteer": "^4.10.0",

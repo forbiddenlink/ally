@@ -179,7 +179,7 @@ ally report
 
 ## Links
 
-- **GitHub:** [github.com/lizthegrey/ally](https://github.com/lizthegrey/ally)
+- **GitHub:** [github.com/forbiddenlink/ally](https://github.com/forbiddenlink/ally)
 - **npm:** [npmjs.com/package/ally-a11y](https://npmjs.com/package/ally-a11y)
 
 ---
