@@ -154,11 +154,8 @@ Score History:
 ### Try It Yourself
 
 ```bash
-# Clone the repo
-git clone https://github.com/forbiddenlink/ally.git
-cd ally
-npm install
-npm link
+# Install globally
+npm install -g ally-a11y
 
 # Scan your project
 ally scan ./src
@@ -295,6 +292,7 @@ ally scan ./src --compare-baseline --fail-on-regression
 
 ## Links
 
+- **npm:** [npmjs.com/package/ally-a11y](https://www.npmjs.com/package/ally-a11y)
 - **GitHub:** [github.com/forbiddenlink/ally](https://github.com/forbiddenlink/ally)
 
 ---
