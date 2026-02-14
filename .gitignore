@@ -43,8 +43,8 @@ test-results.*/
 # Editor history
 .history/
 
-# Claude Code cache
-.claude/cache/
+# Claude Code (local dev environment)
+.claude/
 
 # Specter knowledge graph cache
 .specter/

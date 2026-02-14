@@ -175,14 +175,24 @@ async function runAxeOnPlaywrightPage(page: PageAdapter, tags: string[]): Promis
 }
 
 /**
- * Convert axe results to our Violation format
+ * Map raw axe violations to our Violation format
+ * Shared by both Puppeteer and Playwright code paths
+ * Handles axe-core Result type (which may have null impact)
  */
-function convertAxeResults(results: AxeResults): {
-  violations: Violation[];
-  passes: number;
-  incomplete: number;
-} {
-  const violations: Violation[] = results.violations.map((v) => ({
+function mapAxeViolations(axeViolations: unknown[]): Violation[] {
+  return (axeViolations as Array<{
+    id: string;
+    impact: string | null | undefined;
+    description: string;
+    help: string;
+    helpUrl: string;
+    tags: string[];
+    nodes: Array<{
+      html: string;
+      target: Array<string | string[]>;
+      failureSummary?: string;
+    }>;
+  }>).map((v) => ({
     id: v.id,
     impact: (v.impact || 'minor') as Severity,
     description: v.description,
@@ -195,6 +205,17 @@ function convertAxeResults(results: AxeResults): {
       failureSummary: n.failureSummary || '',
     })),
   }));
+}
+
+/**
+ * Convert axe results to our Violation format
+ */
+function convertAxeResults(results: AxeResults): {
+  violations: Violation[];
+  passes: number;
+  incomplete: number;
+} {
+  const violations = mapAxeViolations(results.violations);
 
   return {
     violations,
@@ -286,19 +307,7 @@ export class AccessibilityScanner {
           .withTags(tags)
           .analyze();
 
-        const violations: Violation[] = results.violations.map((v) => ({
-          id: v.id,
-          impact: (v.impact || 'minor') as Severity,
-          description: v.description,
-          help: v.help,
-          helpUrl: v.helpUrl,
-          tags: v.tags,
-          nodes: v.nodes.map((n) => ({
-            html: n.html,
-            target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
-            failureSummary: n.failureSummary || '',
-          })),
-        }));
+        const violations = mapAxeViolations(results.violations);
 
         return {
           url: fileUrl,
@@ -348,19 +357,7 @@ export class AccessibilityScanner {
           .withTags(tags)
           .analyze();
 
-        const violations: Violation[] = results.violations.map((v) => ({
-          id: v.id,
-          impact: (v.impact || 'minor') as Severity,
-          description: v.description,
-          help: v.help,
-          helpUrl: v.helpUrl,
-          tags: v.tags,
-          nodes: v.nodes.map((n) => ({
-            html: n.html,
-            target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
-            failureSummary: n.failureSummary || '',
-          })),
-        }));
+        const violations = mapAxeViolations(results.violations);
 
         return {
           url,
@@ -410,19 +407,7 @@ export class AccessibilityScanner {
           .withTags(tags)
           .analyze();
 
-        const violations: Violation[] = results.violations.map((v) => ({
-          id: v.id,
-          impact: (v.impact || 'minor') as Severity,
-          description: v.description,
-          help: v.help,
-          helpUrl: v.helpUrl,
-          tags: v.tags,
-          nodes: v.nodes.map((n) => ({
-            html: n.html,
-            target: n.target.map(t => typeof t === 'string' ? t : t.join(' ')),
-            failureSummary: n.failureSummary || '',
-          })),
-        }));
+        const violations = mapAxeViolations(results.violations);
 
         return {
           url: identifier,

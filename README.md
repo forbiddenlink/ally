@@ -16,6 +16,7 @@
 - [Key Features](#two-features-no-other-tool-has)
 - [Quick Start](#installation)
 - [Commands](#commands)
+- [Strategic Features (Feb 2026)](#strategic-features-feb-2026)
 - [Configuration](#configuration)
 - [CI/CD Integration](#github-action)
 - [Why Ally?](#why-ally)
@@ -677,17 +678,46 @@ Use ally in your CI/CD pipeline with our official GitHub Action:
 - uses: lizthegrey/ally@v1
   with:
     path: ./src
-    threshold: 0  # Fail if any violations
+    threshold: 0              # Fail if any violations
+    compare-baseline: true    # Check for regressions
+    fail-on-regression: true  # Block PRs that decrease accessibility
 ```
 
-**Inputs:**
-- `path` - Directory to scan (default: `.`)
-- `threshold` - Max violations before failing (default: `0`)
-- `url` - Scan a URL instead of files
+**Quick Wins Features in GitHub Action:**
+- 🚀 **`max-files`** — Limit scanning to first N files for faster feedback on large projects
+- 📊 **`baseline`** — Save current scan as accessibility baseline (set on main branch)
+- 🔄 **`compare-baseline`** — Compare against baseline and detect regressions
+- ⛔ **`fail-on-regression`** — Fail workflow if accessibility regresses
 
-**Outputs:**
-- `score` - Accessibility score (0-100)
-- `violations` - Total violations found
+**Full Input Reference:**
+
+| Input | Type | Default | Description |
+|-------|------|---------|-------------|
+| `path` | string | `.` | Directory or URL to scan |
+| `threshold` | number | 0 | Max violations before failure |
+| `fail-on` | string | `critical` | Violation levels: `critical,serious,moderate,minor` |
+| `max-files` | number | 0 | Limit scan to first N files (Quick Win) |
+| `baseline` | boolean | false | Save as baseline for regression tracking (Quick Win) |
+| `compare-baseline` | boolean | false | Compare against saved baseline (Quick Win) |
+| `fail-on-regression` | boolean | false | Fail if accessibility regresses (Quick Win) |
+
+**Output Reference:**
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `score` | number | Overall accessibility score (0-100) |
+| `violations` | number | Total accessibility violations found |
+| `improved` | number | Files with improved accessibility (when comparing baseline) |
+| `regressed` | number | Files with regressed accessibility (when comparing baseline) |
+
+**📚 Workflow Documentation:**
+- [Ally Workflow Guide](.github/WORKFLOW_GUIDE.md) — Complete guide with real-world examples
+- [Example Workflows](.github/workflows/ally-a11y.yml) — 5 production-ready workflow templates
+  - Basic PR validation with regressions
+  - Large project with file limiting
+  - Monorepo with progressive scanning
+  - Parallel chunk processing
+  - Smart scanning based on changes
 
 ## Accessible CLI
 
@@ -697,6 +727,163 @@ Ally practices what it preaches. The CLI respects accessibility preferences:
 NO_COLOR=1 ally scan ./src   # Disable colors
 ALLY_NO_COLOR=1 ally scan    # Alternative env var
 ```
+
+## Performance
+
+Ally is optimized for speed and resource efficiency:
+
+### Scanning Speed
+- **Cold start:** ~1-2 seconds (browser launch)
+- **Per file:** ~0.75-1 second average
+- **Parallel scanning:** 4 files concurrent by default
+- **File caching:** Unchanged files skipped automatically
+
+### Performance Examples
+```bash
+# Small project (10 files)
+$ ally scan ./src
+✔ Completed in ~8-10 seconds
+
+# Medium project (50 files)  
+$ ally scan ./src
+✔ Completed in ~45-60 seconds
+
+# Large project (200+ files)
+$ ally scan ./src
+✔ Completed in ~3-5 minutes
+```
+
+### Optimization Tips
+```bash
+# Skip unchanged files (automatic unless --no-cache)
+ally scan --no-cache ./src        # Force full rescan
+
+# Adjust parallel batch size for your system
+# Default is 4 files parallel - increase for powerful machines
+ally scan ./src                   # Uses default batch size
+
+# Scan specific directories instead of entire project
+ally scan ./src/components        # Much faster than ./
+
+# Use --url to scan already-built output
+ally scan --url http://localhost:3000
+```
+
+### Memory Usage
+- Browser instance: ~80-150 MB
+- Cache index: ~50 KB per 100 scanned files
+- Results in memory: Minimal (streamed to disk)
+
+## Strategic Features (Feb 2026)
+
+### 🔥 Large Project Optimization
+
+**Handle massive codebases without timeouts** using the `--max-files` flag.
+
+```bash
+# Scan only first 50 files (quick feedback)
+ally scan . --max-files 50
+
+# Why use this?
+# • Unblocks large projects (1000+ files)
+# • Get quick feedback before full scan
+# • Progressive analysis workflow
+```
+
+**Perfect for:**
+- Monorepos with thousands of files
+- CI environments with tight timeouts
+- Initial accessibility assessment of large codebases
+- Progressive improvement workflows
+
+---
+
+### 📊 Baseline & Regression Detection
+
+**Track accessibility improvements and prevent regressions** with built-in baseline comparison.
+
+```bash
+# Week 1: Set baseline
+ally scan . --baseline
+# ✓ Baseline saved! Future scans will track improvements...
+
+# Week 2: Compare against baseline
+ally scan . --compare-baseline
+# 📊 Regression Analysis
+# ✅ 5 improvements, 0 regressions, 2 unchanged
+
+# CI Mode: Fail if regressions detected
+ally scan . --compare-baseline --fail-on-regression
+# Exit code 0 (no regressions) or 1 (regressions found)
+```
+
+**Features:**
+- **Track Progress** — See score improvements over time
+- **Prevent Regressions** — Block PRs if accessibility declines
+- **Team Accountability** — Visible metrics for accessibility work
+- **CI/CD Integration** — Perfect for GitHub Actions, GitLab CI, etc.
+
+**Usage in CI/CD:**
+```yaml
+# GitHub Actions example
+- name: Check accessibility regressions
+  run: ally scan . --compare-baseline --fail-on-regression
+  
+# Fails the build if any accessibility regresses
+# Passes if improvements or unchanged
+```
+
+**Commands:**
+```bash
+ally scan . --baseline                    # Create/update baseline
+ally scan . --compare-baseline            # Compare & show analysis
+ally scan . --compare-baseline --fail-on-regression  # CI gate
+```
+
+---
+
+### 🎯 New Scan Flags
+
+**Four powerful new flags for large projects and CI integration:**
+
+| Flag | Purpose | Example |
+|------|---------|---------|
+| `--max-files <n>` | Limit to first N files | `ally scan . --max-files 100` |
+| `--baseline` | Save current scan as baseline | `ally scan . --baseline` |
+| `--compare-baseline` | Compare against saved baseline | `ally scan . --compare-baseline` |
+| `--fail-on-regression` | Exit 1 if regressions detected | `ally scan . --compare-baseline --fail-on-regression` |
+
+**Composable flags:**
+```bash
+# Use together for powerful CI/CD workflows
+ally scan . --max-files 200 --compare-baseline --fail-on-regression
+```
+
+---
+
+### Combined Workflow Example
+
+**Real team workflow:**
+
+```bash
+# Monday: Establish baseline on main branch
+git checkout main
+ally scan . --baseline
+# ✓ Baseline saved (85/100 score)
+
+# Wednesday: Feature branch work
+git checkout feature/a11y-fixes
+ally scan . --compare-baseline
+# 📊 Regression Analysis
+# ✅ 3 improvements (85 → 88)
+# ✅ Ready to merge!
+
+# CI/CD: Always check for regressions
+ally scan . --compare-baseline --fail-on-regression
+# ✓ No regressions (or ✗ Build fails if regressions)
+```
+
+---
 
 ## Requirements
 

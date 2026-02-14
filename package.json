@@ -31,7 +31,14 @@
   "c8": {
     "include": ["src/**/*.ts"],
     "exclude": ["test/**", "dist/**", "mcp-server/**"],
-    "all": true
+    "all": true,
+    "instrument": true,
+    "sourceMap": true,
+    "produce-source-map": true,
+    "per-file": false,
+    "skip-full": false,
+    "report-dir": "./coverage",
+    "temp-dir": "./coverage/tmp"
   },
   "keywords": [
     "accessibility",

@@ -59,6 +59,13 @@ import {
   detectPageContext,
   type ImpactScore,
 } from '../utils/impact-scores.js';
+import {
+  saveBaseline,
+  loadBaseline,
+  compareWithBaseline,
+  formatRegression,
+  hasBaseline,
+} from '../utils/baseline.js';
 import type { ScanResult, AllyReport, Violation, Severity } from '../types/index.js';
 
 /**
@@ -69,6 +76,41 @@ function isNoColor(): boolean {
 }
 
 type OutputFormat = 'json' | 'sarif' | 'junit' | 'csv';
+
+/**
+ * Retry logic for browser initialization with crash recovery
+ */
+async function initScannerWithRetry(
+  scanner: AccessibilityScanner,
+  maxRetries: number = 2
+): Promise<void> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      await scanner.init();
+      return;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      lastError = err;
+
+      // Check if it's a browser crash or launch error
+      const isBrowserError = err.message.toLowerCase().includes('browser') ||
+        err.message.toLowerCase().includes('crashed') ||
+        err.message.toLowerCase().includes('closed');
+
+      // Only retry on browser-specific errors
+      if (!isBrowserError || attempt >= maxRetries) {
+        throw err;
+      }
+
+      // Wait before retrying (exponential backoff: 1s, 2s)
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+    }
+  }
+
+  throw lastError || new Error('Failed to initialize scanner');
+}
 
 /**
  * Print CI-friendly summary line
@@ -93,6 +135,10 @@ interface ScanCommandOptions {
   noCache?: boolean;
   ci?: boolean;
   browser?: BrowserType;
+  maxFiles?: number;
+  baseline?: boolean;
+  compareBaseline?: boolean;
+  failOnRegression?: boolean;
 }
 
 // SARIF 2.1.0 types
@@ -215,7 +261,62 @@ export async function scanCommand(
     }
   }
 
-  return await scanFiles(targetPath, mergedOutput, json, verbose, mergedFormat, mergedStandard, allIgnorePatterns, mergedTimeout, noCache, ci, projectInfo, mergedBrowser);
+  // Run scan
+  const report = await scanFiles(
+    targetPath,
+    mergedOutput,
+    json,
+    verbose,
+    mergedFormat,
+    mergedStandard,
+    allIgnorePatterns,
+    mergedTimeout,
+    noCache,
+    ci,
+    projectInfo,
+    mergedBrowser,
+    options.maxFiles,
+    options.compareBaseline,
+    options.failOnRegression
+  );
+
+  if (!report) {
+    return null;
+  }
+
+  // Handle baseline operations
+  if (options.baseline) {
+    if (!ci) {
+      printInfo('Setting accessibility baseline...');
+    }
+    await saveBaseline(report, mergedOutput);
+    if (!ci) {
+      printSuccess('Baseline saved! Future scans will track improvements against this baseline.');
+    }
+  }
+
+  // Handle baseline comparison
+  if (options.compareBaseline) {
+    const baseline = await loadBaseline(mergedOutput);
+    if (baseline) {
+      const analysis = compareWithBaseline(report, baseline);
+      if (!ci) {
+        console.log(formatRegression(analysis));
+      }
+      
+      // Fail if regressions and fail-on-regression flag
+      if (options.failOnRegression && analysis.regressed > 0) {
+        if (ci) {
+          printError(`✗ Regression detected: ${analysis.regressed} file(s) have new violations`);
+        }
+        process.exit(1);
+      }
+    } else if (!ci) {
+      printInfo('No baseline found. Run with --baseline first to set a baseline.');
+    }
+  }
+
+  return report;
 }
 
 async function scanUrl(
@@ -341,7 +442,10 @@ async function scanFiles(
   noCache: boolean = false,
   ci: boolean = false,
   projectInfo: ProjectInfo | null = null,
-  browser: BrowserType = 'chromium'
+  browser: BrowserType = 'chromium',
+  maxFiles?: number,
+  compareBaseline?: boolean,
+  failOnRegression?: boolean
 ): Promise<AllyReport | null> {
   const absolutePath = resolve(targetPath);
   const browserLabel = browser !== 'chromium' ? ` [${browser}]` : '';
@@ -355,7 +459,15 @@ async function scanFiles(
 
   const htmlFiles = await findHtmlFiles(absolutePath, ignorePatterns);
   const componentFiles = await findComponentFiles(absolutePath, ignorePatterns);
-  const allFiles = [...htmlFiles];
+  let allFiles = [...htmlFiles];
+
+  // Apply max-files limit if specified
+  if (maxFiles && allFiles.length > maxFiles) {
+    if (!ci) {
+      printInfo(`Limiting to first ${maxFiles} files (use --max-files to adjust)`);
+    }
+    allFiles = allFiles.slice(0, maxFiles);
+  }
 
   if (allFiles.length === 0) {
     if (findSpinner) {
@@ -404,7 +516,7 @@ async function scanFiles(
   }
 
   try {
-    await scanner.init();
+    await initScannerWithRetry(scanner, 2);
 
     // Phase 1: Check cache for all files (unless --no-cache)
     const filesToScan: string[] = [];

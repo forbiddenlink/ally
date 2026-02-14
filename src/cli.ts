@@ -74,6 +74,11 @@ program
     return value;
   })
   .option('--experimental-apca', 'Show APCA Lc values alongside WCAG 2.x contrast ratios (experimental)')
+  .option('--max-files <number>', 'Limit scan to first N files (useful for large projects)')
+  .option('--baseline', 'Set current scan as accessibility baseline (for regression detection)')
+  .option('--compare-baseline', 'Compare against saved baseline and show improvements/regressions')
+  .option('--fail-on-regression', 'Exit with error if accessibility regressions detected (with --compare-baseline)')
+  .option('--no-cache', 'Do not use cache, rescan all files')
   .action(async (path: string | undefined, options) => {
     try {
       // Parse timeout if provided
@@ -93,6 +98,15 @@ program
           process.exit(1);
         }
         options.threshold = threshold;
+      }
+      // Parse max-files if provided
+      if (options.maxFiles !== undefined) {
+        const maxFiles = parseInt(options.maxFiles, 10);
+        if (isNaN(maxFiles) || maxFiles < 1) {
+          console.error('Error: --max-files must be at least 1');
+          process.exit(1);
+        }
+        options.maxFiles = maxFiles;
       }
       const report = await scanCommand(path, options);
 

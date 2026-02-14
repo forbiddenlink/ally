@@ -1,0 +1,131 @@
+name: Accessibility Check with Ally
+
+on:
+  pull_request:
+    paths:
+      - '**.html'
+      - '**.tsx'
+      - '**.jsx'
+      - '**.vue'
+      - 'src/**'
+      - '.github/workflows/ally-a11y.yml'
+  push:
+    branches: [main]
+
+jobs:
+  accessibility:
+    name: A11y Scan & Regression Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # Example 1: Basic scan with threshold
+      - name: Scan for Critical Issues
+        uses: ./
+        with:
+          path: ./src
+          threshold: 0
+          fail-on: critical,serious
+
+      # Example 2: Large project with file limiting
+      # (useful for monorepos to get fast feedback)
+      - name: Quick Scan - First 100 Files
+        id: quick-scan
+        uses: ./
+        with:
+          path: ./src
+          max-files: 100
+          threshold: 5
+
+      # Example 3: Establish baseline on main branch
+      - name: Set Baseline on Main Branch
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: ./
+        with:
+          path: ./src
+          baseline: true
+          threshold: 0
+
+      # Example 4: Check for regressions on PRs
+      - name: Check Accessibility Regressions
+        if: github.event_name == 'pull_request'
+        id: regression-check
+        uses: ./
+        with:
+          path: ./src
+          compare-baseline: true
+          fail-on-regression: true
+        continue-on-error: true
+
+      # Example 5: Post results as comment on PR
+      - name: Comment on PR with Results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const score = '${{ steps.quick-scan.outputs.score }}';
+            const violations = '${{ steps.quick-scan.outputs.violations }}';
+            const improved = '${{ steps.regression-check.outputs.improved }}' || '0';
+            const regressed = '${{ steps.regression-check.outputs.regressed }}' || '0';
+            
+            let comment = `## ♿ Accessibility Report
+            
+            **Score:** \`${score}/100\`
+            **Total Violations:** \`${violations}\`
+            
+            `;
+            
+            if (improved > 0) {
+              comment += `✅ **Improved:** ${improved} files improved accessibility\n`;
+            }
+            
+            if (regressed > 0) {
+              comment += `⚠️ **Regressed:** ${regressed} files had accessibility decline\n`;
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      # Upload report as artifact
+      - name: Upload Accessibility Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ally-report
+          path: .ally/ACCESSIBILITY.md
+          retention-days: 30
+
+  # Optional: Progressive scanning for very large projects
+  large-project-scan:
+    name: Large Project Accessibility Scan
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'large-project')
+    
+    strategy:
+      matrix:
+        chunk: [1, 2, 3, 4, 5]  # Scan in 5 parallel chunks
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Scan Files (Chunk ${{ matrix.chunk }})
+        uses: ./
+        with:
+          path: ./src
+          max-files: 200  # 200 files per chunk × 5 = 1000 files total
+          threshold: 10

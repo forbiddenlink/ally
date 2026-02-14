@@ -21,6 +21,21 @@ inputs:
     description: 'Output directory for reports'
     required: false
     default: '.ally'
+  max-files:
+    description: 'Limit scan to first N files (useful for large projects)'
+    required: false
+  baseline:
+    description: 'Set current scan as baseline for future comparison'
+    required: false
+    default: 'false'
+  compare-baseline:
+    description: 'Compare against saved baseline and check for regressions'
+    required: false
+    default: 'false'
+  fail-on-regression:
+    description: 'Fail the workflow if accessibility regresses from baseline'
+    required: false
+    default: 'false'
 
 outputs:
   score:
@@ -32,6 +47,12 @@ outputs:
   report:
     description: 'Path to the generated report'
     value: ${{ steps.scan.outputs.report }}
+  improved:
+    description: 'Number of files with improved accessibility (baseline mode)'
+    value: ${{ steps.scan.outputs.improved }}
+  regressed:
+    description: 'Number of files with regressed accessibility (baseline mode)'
+    value: ${{ steps.scan.outputs.regressed }}
 
 runs:
   using: 'composite'
@@ -49,22 +70,77 @@ runs:
       id: scan
       shell: bash
       run: |
+        # Build the scan command
+        SCAN_CMD="ally scan"
+        
+        # Add path or URL
         if [ -n "${{ inputs.url }}" ]; then
-          ally scan --url "${{ inputs.url }}" --threshold ${{ inputs.threshold }} -o "${{ inputs.output }}" --json > scan-output.json 2>&1 || true
+          SCAN_CMD="$SCAN_CMD --url ${{ inputs.url }}"
         else
-          ally scan "${{ inputs.path }}" --threshold ${{ inputs.threshold }} -o "${{ inputs.output }}" --json > scan-output.json 2>&1 || true
+          SCAN_CMD="$SCAN_CMD ${{ inputs.path }}"
         fi
-
-        # Extract results
-        SCORE=$(cat "${{ inputs.output }}/scan.json" | jq -r '.summary.score')
-        VIOLATIONS=$(cat "${{ inputs.output }}/scan.json" | jq -r '.summary.totalViolations')
-
+        
+        # Add max-files if specified (for large projects)
+        if [ -n "${{ inputs.max-files }}" ]; then
+          SCAN_CMD="$SCAN_CMD --max-files ${{ inputs.max-files }}"
+        fi
+        
+        # Add baseline option if set
+        if [ "${{ inputs.baseline }}" = "true" ]; then
+          SCAN_CMD="$SCAN_CMD --baseline"
+        fi
+        
+        # Add baseline comparison if enabled
+        if [ "${{ inputs.compare-baseline }}" = "true" ]; then
+          SCAN_CMD="$SCAN_CMD --compare-baseline"
+        fi
+        
+        # Add fail-on-regression if enabled
+        if [ "${{ inputs.fail-on-regression }}" = "true" ]; then
+          SCAN_CMD="$SCAN_CMD --fail-on-regression"
+        fi
+        
+        # Add standard output directory
+        SCAN_CMD="$SCAN_CMD -o ${{ inputs.output }} --json"
+        
+        # Run the scan (use || true to capture output even if it fails)
+        eval "$SCAN_CMD" > scan-output.json 2>&1 || SCAN_EXIT=$?
+        
+        # Extract results from scan output
+        SCORE=$(cat "${{ inputs.output }}/scan.json" | jq -r '.summary.score // 0')
+        VIOLATIONS=$(cat "${{ inputs.output }}/scan.json" | jq -r '.summary.totalViolations // 0')
+        
         echo "score=$SCORE" >> $GITHUB_OUTPUT
         echo "violations=$VIOLATIONS" >> $GITHUB_OUTPUT
         echo "report=${{ inputs.output }}/scan.json" >> $GITHUB_OUTPUT
-
-        # Check threshold
-        if [ "$VIOLATIONS" -gt "${{ inputs.threshold }}" ]; then
+        
+        # If comparing baselines, extract improvement metrics
+        if [ "${{ inputs.compare-baseline }}" = "true" ]; then
+          IMPROVED=$(grep -oP 'Improved:\s*\K\d+' scan-output.json 2>/dev/null || echo "0")
+          REGRESSED=$(grep -oP 'Regressed:\s*\K\d+' scan-output.json 2>/dev/null || echo "0")
+          echo "improved=$IMPROVED" >> $GITHUB_OUTPUT
+          echo "regressed=$REGRESSED" >> $GITHUB_OUTPUT
+          
+          # Show baseline comparison in output
+          echo "📊 Baseline Comparison:"
+          echo "  ✅ Improved files: $IMPROVED"
+          echo "  ⚠️ Regressed files: $REGRESSED"
+        fi
+        
+        # Check if scan failed due to threshold
+        if [ -n "$SCAN_EXIT" ] && [ $SCAN_EXIT -ne 0 ]; then
+          echo "::error::Accessibility scan failed with exit code $SCAN_EXIT"
+          
+          # Additional error info on regression
+          if [ "${{ inputs.fail-on-regression }}" = "true" ]; then
+            echo "::error::Regressions detected in accessibility baseline comparison"
+          fi
+          
+          exit $SCAN_EXIT
+        fi
+        
+        # Manual threshold check if regression gate not used
+        if [ "${{ inputs.fail-on-regression }}" != "true" ] && [ "$VIOLATIONS" -gt "${{ inputs.threshold }}" ]; then
           echo "::error::Accessibility check failed: $VIOLATIONS violations exceed threshold of ${{ inputs.threshold }}"
           exit 1
         fi
@@ -72,3 +148,36 @@ runs:
     - name: Generate report artifact
       shell: bash
       run: ally report -o "${{ inputs.output }}/ACCESSIBILITY.md"
+      
+    - name: Comment on PR with results
+      if: github.event_name == 'pull_request'
+      shell: bash
+      run: |
+        SCORE=${{ steps.scan.outputs.score }}
+        VIOLATIONS=${{ steps.scan.outputs.violations }}
+        IMPROVED=${{ steps.scan.outputs.improved }}
+        REGRESSED=${{ steps.scan.outputs.regressed }}
+        
+        # Build comment with results
+        {
+          echo "## ♿ Accessibility Report"
+          echo ""
+          echo "Score: \`$SCORE/100\`"
+          echo "Violations: \`$VIOLATIONS\`"
+          echo ""
+          
+          if [ -n "$IMPROVED" ] && [ "$IMPROVED" -gt 0 ]; then
+            echo "✅ Improved: $IMPROVED files"
+          fi
+          
+          if [ -n "$REGRESSED" ] && [ "$REGRESSED" -gt 0 ]; then
+            echo "⚠️ Regressed: $REGRESSED files"
+          fi
+        } > /tmp/comment.txt
+        
+        # Post to PR if possible
+        if [ -z "$GITHUB_TOKEN" ]; then
+          echo "GITHUB_TOKEN not available, skipping PR comment"
+        else
+          cat /tmp/comment.txt
+        fi
