@@ -48,3 +48,6 @@ test-results.*/
 
 # Specter knowledge graph cache
 .specter/
+
+# Internal session notes
+thoughts/

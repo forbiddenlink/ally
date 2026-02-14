@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <title>TechStartup - Innovation for Tomorrow</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-    .hero { background: #1a1a2e; color: #666; padding: 60px 20px; text-align: center; }
+    .hero { background: #1a1a2e; color: #b0b0b0; padding: 60px 20px; text-align: center; }
     .hero h1 { color: #888; font-size: 48px; }
     .nav { background: #16213e; padding: 15px; }
-    .nav a { color: #4a4a6a; margin: 0 15px; text-decoration: none; }
-    .cta-button { background: #e94560; padding: 15px 30px; border: none; font-size: 18px; cursor: pointer; }
+    .nav a { color: #8f9bb3; margin: 0 15px; text-decoration: none; }
+    .cta-button { background: #d62839; color: #fff; padding: 15px 30px; border: none; font-size: 18px; cursor: pointer; }
     .features { display: flex; padding: 40px; gap: 20px; }
     .feature-card { flex: 1; padding: 20px; background: #f8f8f8; }
-    .contact-form { padding: 40px; background: #eee; }
+    .contact -form { padding: 40px; background: #eee; }
     .contact-form input { padding: 10px; margin: 10px 0; width: 300px; }
-    .footer { background: #1a1a2e; color: #444; padding: 20px; text-align: center; }
+    .footer { background: #1a1a2e; color: #9a9a9a; padding: 20px; text-align: center; }
     .social-icons div { display: inline-block; width: 40px; height: 40px; background: #333; margin: 5px; cursor: pointer; }
   </style>
 </head>
@@ -24,34 +24,34 @@
   <nav class="nav">
     <a href="/">TechStartup</a>
     <a href="/products">Products</a>
-    <a href="/pricing"></a><!-- Empty link - WCAG 2.4.4 -->
+    <a href="/pricing">Pricing</a><!-- Empty link - WCAG 2.4.4 -->
     <a href="/about">Click here</a><!-- Vague link text -->
     <a href="/contact">Contact</a>
   </nav>
 
   <!-- Hero section with contrast issues -->
   <div class="hero">
-    <img src="hero-banner.jpg" width="100%"><!-- Missing alt - WCAG 1.1.1 -->
+    <img alt="hero banner" src="hero-banner.jpg" width="100%"><!-- Missing alt - WCAG 1.1.1 -->
     <h1>Build the Future Today</h1><!-- Low contrast: #888 on #1a1a2e -->
     <p>We help startups scale with cutting-edge technology solutions.</p><!-- Low contrast: #666 on #1a1a2e -->
-    <button class="cta-button"></button><!-- Empty button - WCAG 4.1.2 -->
+    <button class="cta-button">Get Started</button><!-- Empty button - WCAG 4.1.2 -->
   </div>
 
   <!-- Features section -->
   <section class="features">
     <div class="feature-card">
-      <img src="icon-speed.svg"><!-- Missing alt -->
+      <img alt="icon speed" src="icon-speed.svg"><!-- Missing alt -->
       <h3>Lightning Fast</h3>
       <p>Our platform delivers results in milliseconds.</p>
     </div>
     <div class="feature-card">
-      <img src="icon-secure.svg"><!-- Missing alt -->
+      <img alt="icon secure" src="icon-secure.svg"><!-- Missing alt -->
       <h3>Enterprise Security</h3>
-      <p>Bank-level encryption protects your data.</p>
+      <p>Bank-level encryzsdzsption protects your data.</p>
     </div>
     <div class="feature-card">
-      <img src="icon-scale.svg"><!-- Missing alt -->
-      <h3>Infinite Scale</h3>
+      <img alt="icon scale" src="icon-scale.svg"><!-- Missing alt -->
+dd      <h3>Infinite Scale</h3>
       <p>Grow from startup to enterprise seamlessly.</p>
     </div>
   </section>
@@ -66,7 +66,7 @@
       <br>
       <input type="tel" placeholder="Phone number"><!-- Missing label -->
       <br>
-      <div onclick="submitForm()" style="background: #e94560; color: white; padding: 15px; display: inline-block; cursor: pointer;">
+      <div onclick="submitForm()" style="background: #d62839; color: white; padding: 15px; display: inline-block; cursor: pointer;">
         Submit
       </div><!-- Div as button - not keyboard accessible - WCAG 2.1.1 -->
     </form>
@@ -76,11 +76,11 @@
   <div class="footer">
     <p>Follow us on social media</p>
     <div class="social-icons">
-      <div onclick="window.open('https://twitter.com')" role="button"></div><!-- Empty interactive element -->
-      <div onclick="window.open('https://linkedin.com')" role="button"></div>
-      <div onclick="window.open('https://github.com')" role="button"></div>
+      <div onclick="window.open('https://twitter.com')" role="button" aria-label="Follow us on Twitter"></div><!-- Empty interactive element -->
+      <div onclick="window.open('https://linkedin.com')" role="button" aria-label="Follow us on LinkedIn"></div>
+      <div onclick="window.open('https://github.com')" role="button" aria-label="Follow us on GitHub"></div>
     </div>
-    <p style="color: #444; font-size: 12px;">Copyright 2026 TechStartup Inc. All rights reserved.</p><!-- Low contrast -->
+    <p style="color: #9a9a9a; font-size: 12px;">Copyright 2026 TechStartup Inc. All rights reserved.</p><!-- Low contrast -->
   </div>
 
   <!-- Autoplaying video without controls -->

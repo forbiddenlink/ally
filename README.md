@@ -44,6 +44,7 @@ No issues found (score: 100) ✨
 ```
 
 **Why it's unique:**
+
 - 🔥 **Instant fixes** — No "fix later" backlog
 - 🎯 **High confidence** — Only applies fixes ≥90% confidence
 - ⚡ **Zero friction** — Edit files normally, ally handles the rest
@@ -67,6 +68,7 @@ $ ally scan ./src
 ```
 
 **Why developers love it:**
+
 - 💯 **Prioritization** — No more guessing what to fix first
 - 💡 **Business context** — Understand why violations block users
 - 👥 **User impact** — See who's affected (screen readers, low vision, etc.)
@@ -80,6 +82,7 @@ $ ally scan ./src
 ## What It Does
 
 **Core commands (19 total):**
+
 ```bash
 # Scanning
 ally scan ./src          # Scan for violations with impact scores
@@ -109,13 +112,14 @@ ally init                # Initialize ally in your project
 ally doctor              # Diagnose configuration issues
 ally health              # Quick accessibility health check
 ally completion          # Shell tab completion
-``` 
+```
 
 ---
 
 ## Quick Demo
 
 **With Impact Scoring:**
+
 ```bash
 $ ally scan ./src
 
@@ -138,6 +142,7 @@ $ ally scan ./src
 ```
 
 **Interactive Fix:**
+
 ```bash
 $ ally fix
 
@@ -187,6 +192,7 @@ ally init --hooks   # Also generate pre-commit hook
 ```
 
 **Creates:**
+
 - `.ally/` directory for scan results
 - `.copilot/mcp-config.json` for Copilot CLI integration
 - `.husky/pre-commit` (with `--hooks` flag) for automated scanning
@@ -200,6 +206,7 @@ ally stats    # View score, trends, and progress over time
 ```
 
 **Features:**
+
 - Animated score display
 - Progress history tracking
 - Motivational feedback
@@ -216,6 +223,7 @@ ally history --verbose       # Show detailed information
 ```
 
 **Features:**
+
 - **Current score** with change from previous scan
 - **Trend analysis** (improving/declining/stable)
 - **Streak tracking** (consecutive improving scans)
@@ -226,7 +234,8 @@ ally history --verbose       # Show detailed information
 - **Motivational messages** based on your progress
 
 **Example Output:**
-```
+
+```text
 ╭───── 📊 Accessibility Progress ─────╮
 │                                     │
 │   Current Score: 85/100 +7          │
@@ -276,6 +285,7 @@ ally scan --fail-on critical,serious  # Fail only on specific severities
 ```
 
 **Impact Scoring Features:**
+
 - **0-100 score** per violation based on user impact
 - **Business reasoning** (e.g., "Users cannot navigate your site")
 - **Affected user groups** (screen readers, low vision, keyboard-only, etc.)
@@ -285,6 +295,7 @@ ally scan --fail-on critical,serious  # Fail only on specific severities
 - **Auto-sorted** by impact (highest first)
 
 **CI Integration:**
+
 ```yaml
 # GitHub Actions example
 - run: ally scan ./src --threshold 0
@@ -331,6 +342,7 @@ ally fix -s serious          # Only fix serious+ issues
 ```
 
 **Features:**
+
 - 35+ automated fix patterns (image-alt, button-name, ARIA, etc.)
 - Shows diff before applying
 - Approve/reject each change
