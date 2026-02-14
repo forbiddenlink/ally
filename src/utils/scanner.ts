@@ -6,7 +6,8 @@ import puppeteer, { type Browser, type Page } from 'puppeteer';
 import { AxePuppeteer } from '@axe-core/puppeteer';
 import axe from 'axe-core';
 import { glob } from 'glob';
-import { resolve } from 'path';
+import { resolve, extname } from 'path';
+import { stat } from 'fs/promises';
 import type { ScanResult, Violation, Severity, AllyReport, ReportSummary } from '../types/index.js';
 import {
   createBrowser,
@@ -600,6 +601,23 @@ export class AccessibilityScanner {
 const DEFAULT_IGNORE = ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'];
 
 export async function findHtmlFiles(targetPath: string, extraIgnore: string[] = []): Promise<string[]> {
+  // Check if targetPath is a file (not a directory)
+  try {
+    const stats = await stat(targetPath);
+    if (stats.isFile()) {
+      // If it's a file with a supported extension, return it directly
+      const ext = extname(targetPath).toLowerCase();
+      if (SUPPORTED_EXTENSIONS.includes(ext)) {
+        return [resolve(targetPath)];
+      }
+      // File exists but not a supported extension
+      return [];
+    }
+  } catch {
+    // Path doesn't exist or can't be accessed, fall through to glob
+  }
+
+  // It's a directory, use glob to find files
   const patterns = SUPPORTED_EXTENSIONS.map((ext) => `**/*${ext}`);
   const files = await glob(patterns, {
     cwd: targetPath,
@@ -610,6 +628,23 @@ export async function findHtmlFiles(targetPath: string, extraIgnore: string[] = 
 }
 
 export async function findComponentFiles(targetPath: string, extraIgnore: string[] = []): Promise<string[]> {
+  // Check if targetPath is a file (not a directory)
+  try {
+    const stats = await stat(targetPath);
+    if (stats.isFile()) {
+      // If it's a file with a supported extension, return it directly
+      const ext = extname(targetPath).toLowerCase();
+      if (COMPONENT_EXTENSIONS.includes(ext)) {
+        return [resolve(targetPath)];
+      }
+      // File exists but not a supported extension
+      return [];
+    }
+  } catch {
+    // Path doesn't exist or can't be accessed, fall through to glob
+  }
+
+  // It's a directory, use glob to find files
   const patterns = COMPONENT_EXTENSIONS.map((ext) => `**/*${ext}`);
   const files = await glob(patterns, {
     cwd: targetPath,

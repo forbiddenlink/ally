@@ -14,18 +14,21 @@ import {
   printWarning,
 } from '../utils/ui.js';
 import { suggestInit, suggestRescan } from '../utils/errors.js';
+import { checkCopilotCli } from '../utils/copilot.js';
+import { execSync } from 'child_process';
 import type { AllyReport, Violation, Severity } from '../types/index.js';
 
 interface ExplainOptions {
   input?: string;
   severity?: Severity;
   limit?: number;
+  ai?: boolean;
 }
 
 export async function explainCommand(options: ExplainOptions = {}): Promise<void> {
   printBanner();
 
-  const { input = '.ally/scan.json', severity, limit = 10 } = options;
+  const { input = '.ally/scan.json', severity, limit = 10, ai = false } = options;
 
   // Load scan results
   const spinner = createSpinner('Loading scan results...');
@@ -78,6 +81,19 @@ export async function explainCommand(options: ExplainOptions = {}): Promise<void
   console.log(chalk.dim('━'.repeat(50)));
   console.log();
 
+  // Check if AI mode requested
+  if (ai) {
+    const copilot = checkCopilotCli();
+    if (copilot.available) {
+      await explainWithCopilot(violations, copilot.command);
+      return;
+    } else {
+      printWarning('Copilot CLI not available. Using built-in explanations.');
+      printInfo('Install Copilot CLI: npm install -g @github/copilot-cli');
+      console.log();
+    }
+  }
+
   // Generate explanations for each violation
   for (let i = 0; i < violations.length; i++) {
     const violation = violations[i];
@@ -88,11 +104,71 @@ export async function explainCommand(options: ExplainOptions = {}): Promise<void
   console.log();
   console.log(chalk.dim('━'.repeat(50)));
   console.log();
-  printInfo('To get AI-powered explanations, run:');
-  console.log(chalk.cyan(`  copilot -p "Explain these accessibility issues in plain language: ${reportPath}"`));
+  printInfo('For AI-powered explanations, run:');
+  console.log(chalk.cyan(`  ally explain --ai`));
   console.log();
   printInfo('Or fix issues directly:');
   console.log(chalk.cyan(`  ally fix`));
+}
+
+/**
+ * Use Copilot CLI to explain violations with deep context
+ */
+async function explainWithCopilot(violations: Violation[], command: string): Promise<void> {
+  console.log(chalk.cyan('🤖 Using GitHub Copilot CLI for AI-powered explanations...'));
+  console.log();
+
+  for (let i = 0; i < violations.length; i++) {
+    const violation = violations[i];
+
+    console.log(chalk.bold(`${i + 1}. ${violation.help}`));
+    console.log(chalk.dim(`   Rule: ${violation.id} | Severity: ${violation.impact}`));
+    console.log();
+
+    // Create a focused prompt for Copilot
+    const prompt = `Explain this accessibility violation in plain language for a developer:
+
+Issue: ${violation.help}
+Rule ID: ${violation.id}
+Severity: ${violation.impact}
+Description: ${violation.description}
+
+Please explain:
+1. What is wrong (1-2 sentences)
+2. Who is affected and how (specific user groups)
+3. How to fix it (with a code example if helpful)
+4. Why this matters for the business
+
+Keep the explanation concise and actionable.`;
+
+    try {
+      // Execute Copilot CLI synchronously
+      const cmdParts = command.split(' ');
+      const fullCommand = cmdParts.length > 1
+        ? `${command} explain "${prompt.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`
+        : `${command} -p "${prompt.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`;
+
+      const result = execSync(fullCommand, {
+        encoding: 'utf-8',
+        timeout: 30000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      console.log(chalk.white(result.trim()));
+    } catch (error) {
+      // Fallback to built-in explanation if Copilot fails
+      const explanation = getPlainLanguageExplanation(violation);
+      console.log(chalk.white(`   What's wrong: ${explanation.problem}`));
+      console.log(chalk.white(`   Who it affects: ${explanation.impact}`));
+      console.log(chalk.white(`   How to fix: ${explanation.fix}`));
+    }
+
+    console.log();
+    console.log(chalk.dim(`   Learn more: ${violation.helpUrl}`));
+    console.log();
+    console.log(chalk.dim('   ' + '─'.repeat(45)));
+    console.log();
+  }
 }
 
 async function printExplanation(violation: Violation, index: number): Promise<void> {

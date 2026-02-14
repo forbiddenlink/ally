@@ -154,6 +154,7 @@ program
   .option('-i, --input <file>', 'Path to scan results', '.ally/scan.json')
   .option('-s, --severity <level>', 'Filter by severity (critical, serious, moderate, minor)')
   .option('-l, --limit <number>', 'Maximum number of issues to explain', '10')
+  .option('--ai', 'Use GitHub Copilot CLI for AI-powered explanations')
   .action(async (options) => {
     try {
       const limit = parseInt(options.limit, 10);
