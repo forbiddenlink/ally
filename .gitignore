@@ -22,6 +22,16 @@ npm-debug.log*
 # Test coverage
 coverage/
 
+# Generated test/scan output files
+accessibility.csv
+accessibility.html
+accessibility.json
+accessibility.sarif
+accessibility.junit.xml
+test-report.md
+demo-results.*/
+test-results.*/
+
 # Environment
 .env
 .env.local
@@ -35,3 +45,6 @@ coverage/
 
 # Claude Code cache
 .claude/cache/
+
+# Specter knowledge graph cache
+.specter/
