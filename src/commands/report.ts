@@ -15,14 +15,22 @@ import {
 } from '../utils/ui.js';
 import { suggestInit, suggestRescan } from '../utils/errors.js';
 import { convertToSarif, convertToJunit, convertToCsv } from '../utils/converters.js';
+import { generateConformanceReport } from '../utils/vpat-mappings.js';
+import { generateVpatHtml, calculateSummary, type VpatMetadata } from '../utils/vpat-template.js';
 import type { AllyReport, Severity } from '../types/index.js';
 
-type ReportFormat = 'markdown' | 'html' | 'json' | 'sarif' | 'junit' | 'csv' | 'all';
+type ReportFormat = 'markdown' | 'html' | 'json' | 'sarif' | 'junit' | 'csv' | 'vpat' | 'all';
 
 interface ReportOptions {
   input?: string;
   output?: string;
   format?: ReportFormat;
+  // VPAT-specific options
+  productName?: string;
+  productVersion?: string;
+  vendor?: string;
+  contact?: string;
+  evalDate?: string;
 }
 
 export async function reportCommand(options: ReportOptions = {}): Promise<void> {
@@ -119,6 +127,9 @@ export async function reportCommand(options: ReportOptions = {}): Promise<void> 
       case 'csv':
         reportContent = convertToCsv(report);
         break;
+      case 'vpat':
+        reportContent = generateVpatReport(report, options);
+        break;
       case 'markdown':
       default:
         reportContent = generateMarkdownReport(report);
@@ -136,6 +147,8 @@ export async function reportCommand(options: ReportOptions = {}): Promise<void> 
       outputPath = resolve(dirname(output), 'accessibility.json');
     } else if (format === 'html' && !output.endsWith('.html')) {
       outputPath = resolve(dirname(output), 'accessibility.html');
+    } else if (format === 'vpat' && !output.endsWith('.html')) {
+      outputPath = resolve(dirname(output), 'accessibility-vpat.html');
     }
 
     try {
@@ -408,6 +421,39 @@ function getSeverityIcon(severity: Severity): string {
     minor: '🔵',
   };
   return icons[severity] || '⚪';
+}
+
+function generateVpatReport(report: AllyReport, options: ReportOptions): string {
+  // Extract all unique violation rule IDs from scan results
+  const violationIds: string[] = [];
+  for (const result of report.results) {
+    for (const violation of result.violations) {
+      if (!violationIds.includes(violation.id)) {
+        violationIds.push(violation.id);
+      }
+    }
+  }
+
+  // Generate conformance results
+  const conformanceResults = generateConformanceReport(violationIds, 'AA');
+  const summary = calculateSummary(conformanceResults);
+
+  // Build metadata
+  const metadata: VpatMetadata = {
+    productName: options.productName || 'Web Application',
+    productVersion: options.productVersion || '1.0.0',
+    vendor: options.vendor || 'Organization',
+    contact: options.contact,
+    evaluationDate: options.evalDate || new Date().toISOString().split('T')[0],
+    evaluationMethods: ['Automated testing with ally (axe-core)'],
+    notes: `Based on scan of ${report.totalFiles} file(s) on ${new Date(report.scanDate).toLocaleDateString()}. Accessibility score: ${report.summary.score}/100.`,
+  };
+
+  return generateVpatHtml({
+    metadata,
+    conformanceResults,
+    summary,
+  });
 }
 
 export default reportCommand;

@@ -160,6 +160,37 @@ describe('report command', () => {
     assert.ok(lines[0].includes('file'), 'Should have file column');
   });
 
+  it('should generate VPAT report', async () => {
+    await reportCommand({
+      format: 'vpat',
+      productName: 'Test Product',
+      productVersion: '2.0.0',
+      vendor: 'Test Company',
+    });
+
+    const reportPath = join(tempDir, 'accessibility-vpat.html');
+    assert.ok(existsSync(reportPath), 'VPAT report should exist');
+
+    const content = await readFile(reportPath, 'utf-8');
+    assert.ok(content.includes('<!DOCTYPE html>'), 'Should be valid HTML');
+    assert.ok(content.includes('VPAT'), 'Should have VPAT in content');
+    assert.ok(content.includes('Test Product'), 'Should include product name');
+    assert.ok(content.includes('Test Company'), 'Should include vendor');
+    assert.ok(content.includes('WCAG 2.2 Level A'), 'Should have WCAG Level A table');
+    assert.ok(content.includes('WCAG 2.2 Level AA'), 'Should have WCAG Level AA table');
+  });
+
+  it('should generate VPAT report with default metadata', async () => {
+    await reportCommand({ format: 'vpat' });
+
+    const reportPath = join(tempDir, 'accessibility-vpat.html');
+    assert.ok(existsSync(reportPath), 'VPAT report should exist');
+
+    const content = await readFile(reportPath, 'utf-8');
+    assert.ok(content.includes('Web Application'), 'Should have default product name');
+    assert.ok(content.includes('Organization'), 'Should have default vendor');
+  });
+
   it('should handle missing scan results', async () => {
     // Remove scan.json
     await rm(join(tempDir, '.ally', 'scan.json'));

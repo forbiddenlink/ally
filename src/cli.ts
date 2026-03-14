@@ -200,7 +200,12 @@ program
   .description('Generate accessibility report (ACCESSIBILITY.md)')
   .option('-i, --input <file>', 'Path to scan results', '.ally/scan.json')
   .option('-o, --output <file>', 'Output file path', 'ACCESSIBILITY.md')
-  .option('-f, --format <type>', 'Report format (markdown, json, html)', 'markdown')
+  .option('-f, --format <type>', 'Report format (markdown, json, html, sarif, junit, csv, vpat, all)', 'markdown')
+  .option('--product-name <name>', 'Product name for VPAT report')
+  .option('--product-version <version>', 'Product version for VPAT report')
+  .option('--vendor <name>', 'Vendor/company name for VPAT report')
+  .option('--contact <email>', 'Accessibility contact email for VPAT report')
+  .option('--eval-date <date>', 'Evaluation date for VPAT report (YYYY-MM-DD)')
   .action(async (options) => {
     try {
       await reportCommand(options);
