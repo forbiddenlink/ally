@@ -27,7 +27,8 @@ import {
   checkMcpConfig,
 } from '../utils/copilot.js';
 import { suggestInit, suggestRescan } from '../utils/errors.js';
-import { generateSuggestedFix, getFixConfidence, getConfidenceLevel, FIX_CONFIDENCE } from '../utils/fix-patterns.js';
+import { generateSuggestedFix, getFixConfidence, getConfidenceLevel, FIX_CONFIDENCE, getAttr } from '../utils/fix-patterns.js';
+import { generateAltTextFromUrl, isOpenAIAvailable, inferImageContext } from '../utils/ai-alt-text.js';
 import type { AllyReport, Violation, Severity, FixResult } from '../types/index.js';
 
 // Track if we've shown Copilot instructions
@@ -170,6 +171,7 @@ interface FixOptions {
   auto?: boolean;
   dryRun?: boolean;
   yes?: boolean;
+  aiAlt?: boolean;
 }
 
 // Pending fix for interactive review
@@ -190,7 +192,13 @@ interface FileViolation {
 export async function fixCommand(options: FixOptions = {}): Promise<void> {
   printBanner();
 
-  const { input = '.ally/scan.json', severity, auto = false, dryRun = false, yes = false } = options;
+  const { input = '.ally/scan.json', severity, auto = false, dryRun = false, yes = false, aiAlt = false } = options;
+
+  // Check AI availability if requested
+  if (aiAlt && !isOpenAIAvailable()) {
+    printWarning('--ai-alt requires OPENAI_API_KEY environment variable');
+    printInfo('Set it with: export OPENAI_API_KEY=your-key');
+  }
 
   // Load scan results
   const spinner = createSpinner('Loading scan results...');
@@ -298,7 +306,7 @@ export async function fixCommand(options: FixOptions = {}): Promise<void> {
       console.log(chalk.dim(`   ${violations.length} issue${violations.length === 1 ? '' : 's'} to fix`));
 
       for (const violation of violations) {
-        const result = await processViolation(file, violation, { auto, dryRun });
+        const result = await processViolation(file, violation, { auto, dryRun, aiAlt });
         fixResults.push(result);
 
         if (result.fixed) {
@@ -640,10 +648,110 @@ function groupViolationsByFile(report: AllyReport, severity?: Severity): FileVio
     });
 }
 
+/**
+ * Write a fix to a file by replacing the old HTML with the new HTML
+ */
+async function writeFixToFile(
+  filePath: string,
+  oldHtml: string,
+  newHtml: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Read the file
+    let content = await readFile(filePath, 'utf-8');
+    const normalizedOld = oldHtml.trim();
+
+    // Strategy 1: Direct match
+    if (content.includes(normalizedOld)) {
+      content = content.replace(normalizedOld, newHtml);
+      await writeFile(filePath, content, 'utf-8');
+      return { success: true };
+    }
+
+    // Strategy 2: For simple tag-level fixes (like html-has-lang, img-alt),
+    // extract just the opening tag and fix that
+    const tagMatch = normalizedOld.match(/^<([a-z][a-z0-9-]*)/i);
+    if (tagMatch) {
+      const tagName = tagMatch[1].toLowerCase();
+
+      // For self-closing tags like <img>, match the whole tag
+      if (['img', 'input', 'br', 'hr', 'meta', 'link'].includes(tagName)) {
+        // Extract attributes from old and new
+        const oldTagMatch = normalizedOld.match(new RegExp(`^<${tagName}[^>]*>`, 'i'));
+        const newTagMatch = newHtml.match(new RegExp(`^<${tagName}[^>]*>`, 'i'));
+
+        if (oldTagMatch && newTagMatch) {
+          // Find this tag in the file with flexible whitespace
+          const flexiblePattern = oldTagMatch[0]
+            .replace(/\s+/g, '\\s+')
+            .replace(/([<>="'])/g, '\\$1');
+          const regex = new RegExp(flexiblePattern, 'i');
+
+          if (regex.test(content)) {
+            content = content.replace(regex, newTagMatch[0]);
+            await writeFile(filePath, content, 'utf-8');
+            return { success: true };
+          }
+        }
+      }
+
+      // For the html tag specifically, just add lang attribute
+      if (tagName === 'html') {
+        const langAttr = newHtml.match(/lang=["']([^"']*)["']/i);
+        if (langAttr) {
+          // Find <html> or <html ...> and add/update lang
+          const htmlTagRegex = /<html(\s|>)/i;
+          if (htmlTagRegex.test(content)) {
+            if (/<html[^>]*\slang=/i.test(content)) {
+              // Update existing lang attribute
+              content = content.replace(
+                /(<html[^>]*\s)lang=["'][^"']*["']/i,
+                `$1lang="${langAttr[1]}"`
+              );
+            } else {
+              // Add lang attribute
+              content = content.replace(
+                /<html(\s|>)/i,
+                `<html lang="${langAttr[1]}"$1`
+              );
+            }
+            await writeFile(filePath, content, 'utf-8');
+            return { success: true };
+          }
+        }
+      }
+
+      // For button, a, and other elements, try to match just the opening tag
+      if (['button', 'a', 'div', 'span'].includes(tagName)) {
+        const oldTagMatch = normalizedOld.match(new RegExp(`^<${tagName}[^>]*>`, 'i'));
+        const newTagMatch = newHtml.match(new RegExp(`^<${tagName}[^>]*>`, 'i'));
+
+        if (oldTagMatch && newTagMatch) {
+          const flexiblePattern = oldTagMatch[0]
+            .replace(/\s+/g, '\\s*')
+            .replace(/([<>="'])/g, '\\$1');
+          const regex = new RegExp(flexiblePattern, 'i');
+
+          if (regex.test(content)) {
+            content = content.replace(regex, newTagMatch[0]);
+            await writeFile(filePath, content, 'utf-8');
+            return { success: true };
+          }
+        }
+      }
+    }
+
+    return { success: false, error: 'could not find target HTML in file' };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
+  }
+}
+
 async function processViolation(
   file: string,
   violation: Violation,
-  options: { auto: boolean; dryRun: boolean }
+  options: { auto: boolean; dryRun: boolean; aiAlt: boolean }
 ): Promise<FixResult> {
   const severityColors: Record<Severity, (text: string) => string> = {
     critical: chalk.red.bold,
@@ -684,14 +792,85 @@ async function processViolation(
   }
 
   if (options.auto) {
-    console.log(chalk.green('   ✓ Auto-applying fix'));
-    return {
-      file,
-      line: 0,
-      violation: violation.id,
-      fixed: true,
-      skipped: false,
-    };
+    // Get the suggested fix
+    const node = violation.nodes[0];
+    if (!node) {
+      console.log(chalk.yellow('   → Skipped (no node information)'));
+      return { file, line: 0, violation: violation.id, fixed: false, skipped: true };
+    }
+
+    let suggestedFix = generateSuggestedFix(violation, node.html);
+    let confidence = getFixConfidence(violation.id);
+    let usedAi = false;
+
+    // Special handling for image-alt with AI
+    if (violation.id === 'image-alt' && options.aiAlt && isOpenAIAvailable()) {
+      const imgSrc = getAttr(node.html, 'src');
+      if (imgSrc) {
+        console.log(chalk.cyan('   🤖 Generating alt text with AI...'));
+        const context = inferImageContext(imgSrc, node.html);
+
+        // Handle both URL and file paths
+        let aiResult;
+        if (imgSrc.startsWith('http://') || imgSrc.startsWith('https://')) {
+          aiResult = await generateAltTextFromUrl(imgSrc, { context });
+        } else {
+          // For local files, we'd need the full path - skip for now
+          aiResult = { success: false, error: 'Local file AI analysis requires full path', provider: 'none' as const };
+        }
+
+        if (aiResult.success && aiResult.altText) {
+          // Replace the placeholder with AI-generated alt text
+          suggestedFix = node.html.replace(
+            /<img([^>]*)>/i,
+            `<img alt="${aiResult.altText.replace(/"/g, '&quot;')}"$1>`
+          );
+          confidence = aiResult.confidence ?? 0.85;
+          usedAi = true;
+          console.log(chalk.green(`   ✓ AI generated: "${aiResult.altText}"`));
+        } else {
+          console.log(chalk.yellow(`   ⚠ AI failed: ${aiResult.error}`));
+        }
+      }
+    }
+
+    // Only auto-apply if we have a fix AND high confidence (≥90%) OR used AI
+    if (!suggestedFix) {
+      console.log(chalk.yellow('   → Skipped (no auto-fix pattern available)'));
+      return { file, line: 0, violation: violation.id, fixed: false, skipped: true };
+    }
+
+    // Lower threshold for AI-generated fixes since they're contextual
+    const requiredConfidence = usedAi ? 0.80 : 0.90;
+    if (confidence === null || confidence < requiredConfidence) {
+      console.log(chalk.yellow(`   → Skipped (confidence ${confidence ? Math.round(confidence * 100) + '%' : 'unknown'} < ${Math.round(requiredConfidence * 100)}% threshold)`));
+      return { file, line: 0, violation: violation.id, fixed: false, skipped: true };
+    }
+
+    // Actually apply the fix to the file
+    const writeResult = await writeFixToFile(file, node.html, suggestedFix);
+    if (writeResult.success) {
+      const aiLabel = usedAi ? ' via AI' : '';
+      console.log(chalk.green(`   ✓ Auto-applied fix (${Math.round(confidence * 100)}% confidence${aiLabel})`));
+
+      // Save to fix history
+      const wcagCriteria = violation.tags.filter(
+        (tag) => tag.startsWith('wcag') || tag.startsWith('best-practice')
+      );
+      await saveFixHistory({
+        timestamp: new Date().toISOString(),
+        issueType: violation.id,
+        filePath: file,
+        beforeSnippet: node.html,
+        afterSnippet: suggestedFix,
+        wcagCriteria,
+      });
+
+      return { file, line: 0, violation: violation.id, fixed: true, skipped: false };
+    } else {
+      console.log(chalk.yellow(`   → Skipped (${writeResult.error})`));
+      return { file, line: 0, violation: violation.id, fixed: false, skipped: true };
+    }
   }
 
   // Prompt for action
