@@ -674,7 +674,7 @@ export async function treeCommand(
 
   // Validate URL
   let targetUrl = url;
-  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.startsWith('file://')) {
     targetUrl = `https://${targetUrl}`;
   }
 

@@ -225,18 +225,33 @@ function convertAxeResults(results: AxeResults): {
   };
 }
 
+export interface ScannerOptions {
+  timeout?: number;
+  browserType?: BrowserType;
+  shadowDom?: boolean;
+}
+
 export class AccessibilityScanner {
   private browser: Browser | null = null;
   private browserAdapter: BrowserAdapter | null = null;
   private timeout: number;
   private browserType: BrowserType;
   private usePlaywright: boolean;
+  private shadowDom: boolean;
 
-  constructor(timeout: number = DEFAULT_TIMEOUT, browserType: BrowserType = 'chromium') {
-    this.timeout = timeout;
-    this.browserType = browserType;
+  constructor(options: ScannerOptions | number = {}) {
+    // Support both old signature (timeout: number) and new options object
+    if (typeof options === 'number') {
+      this.timeout = options;
+      this.browserType = 'chromium';
+      this.shadowDom = false;
+    } else {
+      this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
+      this.browserType = options.browserType ?? 'chromium';
+      this.shadowDom = options.shadowDom ?? false;
+    }
     // Use Playwright for Firefox and WebKit, Puppeteer for Chromium (default)
-    this.usePlaywright = browserType !== 'chromium';
+    this.usePlaywright = this.browserType !== 'chromium';
   }
 
   async init(): Promise<void> {
@@ -304,9 +319,12 @@ export class AccessibilityScanner {
         await page.goto(fileUrl, { waitUntil: 'load', timeout: this.timeout });
         await page.waitForSelector('body');
 
-        const results = await new AxePuppeteer(page)
-          .withTags(tags)
-          .analyze();
+        let axeBuilder = new AxePuppeteer(page).withTags(tags);
+        if (this.shadowDom) {
+          // Enable iframe scanning and selectors for better Shadow DOM/nested content support
+          axeBuilder = axeBuilder.options({ iframes: true, selectors: true });
+        }
+        const results = await axeBuilder.analyze();
 
         const violations = mapAxeViolations(results.violations);
 
@@ -354,9 +372,11 @@ export class AccessibilityScanner {
       try {
         await page.goto(url, { waitUntil: 'networkidle2', timeout: this.timeout });
 
-        const results = await new AxePuppeteer(page)
-          .withTags(tags)
-          .analyze();
+        let axeBuilder = new AxePuppeteer(page).withTags(tags);
+        if (this.shadowDom) {
+          axeBuilder = axeBuilder.options({ iframes: true, selectors: true });
+        }
+        const results = await axeBuilder.analyze();
 
         const violations = mapAxeViolations(results.violations);
 
@@ -404,9 +424,11 @@ export class AccessibilityScanner {
       try {
         await page.setContent(html, { waitUntil: 'domcontentloaded' });
 
-        const results = await new AxePuppeteer(page)
-          .withTags(tags)
-          .analyze();
+        let axeBuilder = new AxePuppeteer(page).withTags(tags);
+        if (this.shadowDom) {
+          axeBuilder = axeBuilder.options({ iframes: true, selectors: true });
+        }
+        const results = await axeBuilder.analyze();
 
         const violations = mapAxeViolations(results.violations);
 

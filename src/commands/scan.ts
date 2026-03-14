@@ -139,6 +139,7 @@ interface ScanCommandOptions {
   baseline?: boolean;
   compareBaseline?: boolean;
   failOnRegression?: boolean;
+  pierceShadow?: boolean;
 }
 
 // SARIF 2.1.0 types
@@ -238,7 +239,7 @@ export async function scanCommand(
 
   // URL scanning mode
   if (url) {
-    return await scanUrl(url, mergedOutput, json, verbose, mergedFormat, simulate, mergedStandard, mergedTimeout, ci, mergedBrowser);
+    return await scanUrl(url, mergedOutput, json, verbose, mergedFormat, simulate, mergedStandard, mergedTimeout, ci, mergedBrowser, options.pierceShadow ?? false);
   }
 
   // File scanning mode
@@ -277,7 +278,8 @@ export async function scanCommand(
     mergedBrowser,
     options.maxFiles,
     options.compareBaseline,
-    options.failOnRegression
+    options.failOnRegression,
+    options.pierceShadow ?? false
   );
 
   if (!report) {
@@ -329,7 +331,8 @@ async function scanUrl(
   standard: WcagStandard = DEFAULT_STANDARD,
   timeout: number = DEFAULT_TIMEOUT,
   ci: boolean = false,
-  browser: BrowserType = 'chromium'
+  browser: BrowserType = 'chromium',
+  pierceShadow: boolean = false
 ): Promise<AllyReport | null> {
   let spinner: ReturnType<typeof createSpinner> | null = null;
   const browserLabel = browser !== 'chromium' ? ` [${browser}]` : '';
@@ -338,7 +341,7 @@ async function scanUrl(
     spinner.start();
   }
 
-  const scanner = new AccessibilityScanner(timeout, browser);
+  const scanner = new AccessibilityScanner({ timeout, browserType: browser, shadowDom: pierceShadow });
 
   try {
     await scanner.init();
@@ -445,7 +448,8 @@ async function scanFiles(
   browser: BrowserType = 'chromium',
   maxFiles?: number,
   compareBaseline?: boolean,
-  failOnRegression?: boolean
+  failOnRegression?: boolean,
+  pierceShadow: boolean = false
 ): Promise<AllyReport | null> {
   const absolutePath = resolve(targetPath);
   const browserLabel = browser !== 'chromium' ? ` [${browser}]` : '';
@@ -488,7 +492,7 @@ async function scanFiles(
   }
 
   // Scan files
-  const scanner = new AccessibilityScanner(timeout, browser);
+  const scanner = new AccessibilityScanner({ timeout, browserType: browser, shadowDom: pierceShadow });
   const results: ScanResult[] = [];
   const errors: Array<{ path: string; error: string }> = [];
   let skippedCount = 0;

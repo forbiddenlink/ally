@@ -37,7 +37,9 @@ const program = new Command();
 program
   .name('ally')
   .description('Your codebase\'s accessibility ally. Scans, explains, and fixes a11y issues using GitHub Copilot CLI.')
-  .version(version);
+  .version(version)
+  .showSuggestionAfterError(true)
+  .showHelpAfterError('(add --help for additional information)');
 
 // ally scan [path]
 program
@@ -79,6 +81,7 @@ program
   .option('--compare-baseline', 'Compare against saved baseline and show improvements/regressions')
   .option('--fail-on-regression', 'Exit with error if accessibility regressions detected (with --compare-baseline)')
   .option('--no-cache', 'Do not use cache, rescan all files')
+  .option('--pierce-shadow', 'Enable enhanced Shadow DOM and iframe scanning')
   .action(async (path: string | undefined, options) => {
     try {
       // Parse timeout if provided
@@ -181,6 +184,7 @@ program
   .option('-a, --auto', 'Automatically apply all fixes without prompting')
   .option('-d, --dry-run', 'Show what would be fixed without making changes')
   .option('-y, --yes', 'Skip interactive review, apply all suggested fixes')
+  .option('--ai-alt', 'Use AI (OpenAI Vision) to generate meaningful alt text for images')
   .action(async (options) => {
     try {
       await fixCommand(options);
