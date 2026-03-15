@@ -1,5 +1,5 @@
 {
-  "name": "ally-a11y",
+  "name": "ally",
   "version": "1.0.0",
   "description": "Your codebase's accessibility ally. Scans, explains, and fixes a11y issues using GitHub Copilot CLI.",
   "type": "module",
@@ -26,11 +26,17 @@
     "benchmark": "tsx benchmark/scan-speed.ts",
     "benchmark:ci": "tsx benchmark/scan-speed.ts --json --threshold 20",
     "prepublishOnly": "npm run build:all",
-    "postinstall": "node -e \"console.log('\\n✅ ally-a11y installed! Run \\x1b[36mally init\\x1b[0m to get started.\\n')\""
+    "postinstall": "node -e \"console.log('\\n\u2705 ally-a11y installed! Run \\x1b[36mally init\\x1b[0m to get started.\\n')\""
   },
   "c8": {
-    "include": ["src/**/*.ts"],
-    "exclude": ["test/**", "dist/**", "mcp-server/**"],
+    "include": [
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "test/**",
+      "dist/**",
+      "mcp-server/**"
+    ],
     "all": true,
     "instrument": true,
     "sourceMap": true,
