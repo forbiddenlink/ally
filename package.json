@@ -77,7 +77,7 @@
     "glob": "^11.0.1",
     "inquirer": "^9.2.23",
     "ora": "^8.1.1",
-    "puppeteer": "^24.2.0",
+    "puppeteer": "^24.39.1",
     "simple-git": "^3.30.0"
   },
   "devDependencies": {
