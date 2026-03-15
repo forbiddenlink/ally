@@ -26,7 +26,7 @@ test-report.md
 demo-results.*/
 test-results.*/
 # Environment
-.env
+.env*
 .env.local
 # Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
