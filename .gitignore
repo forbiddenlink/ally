@@ -3,25 +3,19 @@ node_modules/
 
 # Build output
 dist/
-
 # Ally scan results
 .ally/
-
 # OS files
 .DS_Store
 Thumbs.db
-
 # IDE
 .vscode/
 .idea/
-
 # Logs
 *.log
 npm-debug.log*
-
 # Test coverage
 coverage/
-
 # Generated test/scan output files
 accessibility.csv
 accessibility.html
@@ -31,23 +25,21 @@ accessibility.junit.xml
 test-report.md
 demo-results.*/
 test-results.*/
-
 # Environment
 .env
 .env.local
-
-
 # Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
-
 # Editor history
 .history/
-
 # Claude Code (local dev environment)
 .claude/
-
 # Specter knowledge graph cache
 .specter/
-
 # Internal session notes
 thoughts/
+.next/
+build/
+out/
+# Vercel
+.vercel
