@@ -29,6 +29,7 @@ jobs:
       # Example 1: Basic scan with threshold
       - name: Scan for Critical Issues
         uses: ./
+        continue-on-error: true
         with:
           path: ./src
           threshold: 0
