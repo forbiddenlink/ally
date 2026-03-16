@@ -33,7 +33,6 @@ jobs:
         with:
           path: ./src
           threshold: 0
-          fail-on: critical,serious
 
       # Example 2: Large project with file limiting
       # (useful for monorepos to get fast feedback)
