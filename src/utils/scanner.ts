@@ -1,10 +1,12 @@
 /**
  * Accessibility scanner using axe-core with Puppeteer or Playwright
+ * Also supports Pa11y for alternative WCAG testing
  */
 
 import puppeteer, { type Browser, type Page } from 'puppeteer';
 import { AxePuppeteer } from '@axe-core/puppeteer';
 import axe from 'axe-core';
+import pa11y from 'pa11y';
 import { glob } from 'glob';
 import { resolve, extname } from 'path';
 import { stat } from 'fs/promises';
@@ -762,4 +764,159 @@ export function createReport(results: ScanResult[]): AllyReport {
     results,
     summary: generateSummary(results),
   };
+}
+
+// Pa11y standard mapping
+export type Pa11yStandard = 'WCAG2A' | 'WCAG2AA' | 'WCAG2AAA' | 'Section508';
+
+/**
+ * Map Pa11y issue type to severity
+ * Pa11y uses: error, warning, notice
+ */
+function mapPa11yTypeToSeverity(type: string): Severity {
+  switch (type) {
+    case 'error':
+      return 'serious';
+    case 'warning':
+      return 'moderate';
+    case 'notice':
+      return 'minor';
+    default:
+      return 'minor';
+  }
+}
+
+/**
+ * Convert Pa11y results to our Violation format
+ */
+function convertPa11yResults(issues: Array<{
+  code: string;
+  context: string;
+  message: string;
+  selector: string;
+  type: string;
+  typeCode: number;
+}>): Violation[] {
+  // Group issues by code to match axe-core's violation structure
+  const groupedIssues = new Map<string, {
+    code: string;
+    message: string;
+    type: string;
+    nodes: Array<{ context: string; selector: string }>;
+  }>();
+
+  for (const issue of issues) {
+    const existing = groupedIssues.get(issue.code);
+    if (existing) {
+      existing.nodes.push({ context: issue.context, selector: issue.selector });
+    } else {
+      groupedIssues.set(issue.code, {
+        code: issue.code,
+        message: issue.message,
+        type: issue.type,
+        nodes: [{ context: issue.context, selector: issue.selector }],
+      });
+    }
+  }
+
+  return Array.from(groupedIssues.values()).map((group) => ({
+    id: group.code,
+    impact: mapPa11yTypeToSeverity(group.type),
+    description: group.message,
+    help: group.message,
+    helpUrl: `https://www.w3.org/WAI/WCAG21/Understanding/${group.code.replace(/\./g, '-').toLowerCase()}`,
+    tags: [group.type],
+    nodes: group.nodes.map((node) => ({
+      html: node.context,
+      target: [node.selector],
+      failureSummary: group.message,
+    })),
+  }));
+}
+
+export interface Pa11yOptions {
+  standard?: Pa11yStandard;
+  includeWarnings?: boolean;
+  includeNotices?: boolean;
+  timeout?: number;
+}
+
+/**
+ * Run Pa11y accessibility audit on a URL
+ * Pa11y uses HTML_CodeSniffer under the hood for WCAG testing
+ */
+export async function runPa11yAudit(
+  url: string,
+  options: Pa11yOptions = {}
+): Promise<ScanResult> {
+  const {
+    standard = 'WCAG2AA',
+    includeWarnings = true,
+    includeNotices = false,
+    timeout = DEFAULT_TIMEOUT,
+  } = options;
+
+  const results = await pa11y(url, {
+    standard,
+    includeWarnings,
+    includeNotices,
+    timeout,
+  });
+
+  const violations = convertPa11yResults(results.issues);
+
+  return {
+    url: results.pageUrl,
+    timestamp: new Date().toISOString(),
+    violations,
+    passes: 0, // Pa11y doesn't report passes
+    incomplete: 0, // Pa11y doesn't have incomplete concept
+  };
+}
+
+/**
+ * Run Pa11y accessibility audit on a local HTML file
+ */
+export async function runPa11yAuditFile(
+  filePath: string,
+  options: Pa11yOptions = {}
+): Promise<ScanResult> {
+  const absolutePath = resolve(filePath);
+  const fileUrl = `file://${absolutePath}`;
+
+  const result = await runPa11yAudit(fileUrl, options);
+  result.file = filePath;
+
+  return result;
+}
+
+/**
+ * Run Pa11y audits on multiple URLs in sequence
+ */
+export async function runPa11yAuditBatch(
+  urls: string[],
+  options: Pa11yOptions = {},
+  onProgress?: ScanProgressCallback
+): Promise<{ results: ScanResult[]; errors: Array<{ path: string; error: string }> }> {
+  const results: ScanResult[] = [];
+  const errors: Array<{ path: string; error: string }> = [];
+
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    try {
+      const result = await runPa11yAudit(url, options);
+      results.push(result);
+    } catch (error) {
+      errors.push({
+        path: url,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    if (onProgress) {
+      onProgress(i + 1, urls.length, url);
+    }
+  }
+
+  return { results, errors };
 }
