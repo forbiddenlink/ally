@@ -112,5 +112,16 @@
       "picomatch": ">=4.0.4",
       "rollup": ">=4.59.0"
     }
+  },
+  "overrides": {
+    "basic-ftp": ">=5.2.2",
+    "simple-git": ">=3.32.3",
+    "@hono/node-server": ">=1.19.10",
+    "express-rate-limit": ">=8.2.2",
+    "hono": ">=4.12.4",
+    "minimatch": ">=10.2.3",
+    "path-to-regexp": ">=8.4.0",
+    "picomatch": ">=4.0.4",
+    "rollup": ">=4.59.0"
   }
 }
