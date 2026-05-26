@@ -18,11 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '18'
 
@@ -68,7 +68,7 @@ jobs:
       # Example 5: Post results as comment on PR
       - name: Comment on PR with Results
         if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const score = '${{ steps.quick-scan.outputs.score }}';
@@ -101,7 +101,7 @@ jobs:
       # Upload report as artifact
       - name: Upload Accessibility Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ally-report
           path: .ally/ACCESSIBILITY.md
@@ -118,9 +118,9 @@ jobs:
         chunk: [1, 2, 3, 4, 5]  # Scan in 5 parallel chunks
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '18'
 
