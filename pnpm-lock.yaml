@@ -20,7 +20,7 @@ importers:
   .:
     dependencies:
       '@axe-core/puppeteer':
-        specifier: ^4.11.1
+        specifier: ^4.10.0
         version: 4.11.1(puppeteer@24.40.0(typescript@5.9.3))
       '@clack/prompts':
         specifier: ^1.1.0
@@ -35,13 +35,13 @@ importers:
         specifier: ^22.0.1
         version: 22.0.1
       axe-core:
-        specifier: ^4.11.1
+        specifier: ^4.10.0
         version: 4.11.1
       boxen:
         specifier: ^8.0.1
         version: 8.0.1
       chalk:
-        specifier: ^5.6.2
+        specifier: ^5.4.1
         version: 5.6.2
       cli-progress:
         specifier: ^3.12.0
@@ -50,22 +50,22 @@ importers:
         specifier: ^13.1.0
         version: 13.1.0
       glob:
-        specifier: ^11.1.0
+        specifier: ^11.0.1
         version: 11.1.0
       inquirer:
-        specifier: ^9.3.8
-        version: 9.3.8(@types/node@22.19.15)
+        specifier: ^9.2.23
+        version: 9.3.8(@types/node@22.19.19)
       ora:
-        specifier: ^8.2.0
+        specifier: ^8.1.1
         version: 8.2.0
       pa11y:
         specifier: ^9.1.1
         version: 9.1.1(typescript@5.9.3)
       puppeteer:
-        specifier: ^24.40.0
+        specifier: ^24.2.0
         version: 24.40.0(typescript@5.9.3)
       simple-git:
-        specifier: ^3.36.0
+        specifier: '>=3.32.3'
         version: 3.36.0
     devDependencies:
       '@biomejs/biome':
@@ -78,8 +78,8 @@ importers:
         specifier: ^9.0.9
         version: 9.0.9
       '@types/node':
-        specifier: ^22.19.15
-        version: 22.19.15
+        specifier: ^22.19.19
+        version: 22.19.19
       '@types/pa11y':
         specifier: ^5.3.7
         version: 5.3.7
@@ -90,7 +90,7 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
       typescript:
-        specifier: ^5.9.3
+        specifier: ^5.7.3
         version: 5.9.3
 
 packages:
@@ -460,8 +460,8 @@ packages:
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
 
-  '@types/node@22.19.15':
-    resolution: {integrity: sha512-F0R/h2+dsy5wJAUe3tAU6oqa2qbWY5TpNfL/RGmo1y38hiyO1w3x2jPtt76wmuaJI4DQnOBu21cNXQ2STIUUWg==}
+  '@types/node@22.19.19':
+    resolution: {integrity: sha512-dyh/xO2Fh5bYrfWaaqGrRQQGkNdmYw6AmaAUvYeUMNTWQtvb796ikLdmTchRmOlOiIJ1TDXfWgVx1QkUlQ6Hew==}
 
   '@types/pa11y@5.3.7':
     resolution: {integrity: sha512-lvGs8okuhQSM69WGlXB8c9Sa068kVIZJr/E8/khfH1LoRovlIz8s7sh/ZHOQ24FzFhpzAr1NwhniLAwVld03UA==}
@@ -1572,12 +1572,12 @@ snapshots:
   '@esbuild/win32-x64@0.27.4':
     optional: true
 
-  '@inquirer/external-editor@1.0.3(@types/node@22.19.15)':
+  '@inquirer/external-editor@1.0.3(@types/node@22.19.19)':
     dependencies:
       chardet: 2.1.1
       iconv-lite: 0.7.2
     optionalDependencies:
-      '@types/node': 22.19.15
+      '@types/node': 22.19.19
 
   '@inquirer/figures@1.0.15': {}
 
@@ -1729,7 +1729,7 @@ snapshots:
 
   '@types/cli-progress@3.11.6':
     dependencies:
-      '@types/node': 22.19.15
+      '@types/node': 22.19.19
 
   '@types/inquirer@9.0.9':
     dependencies:
@@ -1738,7 +1738,7 @@ snapshots:
 
   '@types/istanbul-lib-coverage@2.0.6': {}
 
-  '@types/node@22.19.15':
+  '@types/node@22.19.19':
     dependencies:
       undici-types: 6.21.0
 
@@ -1748,15 +1748,15 @@ snapshots:
 
   '@types/puppeteer@5.4.7':
     dependencies:
-      '@types/node': 22.19.15
+      '@types/node': 22.19.19
 
   '@types/through@0.0.33':
     dependencies:
-      '@types/node': 22.19.15
+      '@types/node': 22.19.19
 
   '@types/yauzl@2.10.3':
     dependencies:
-      '@types/node': 22.19.15
+      '@types/node': 22.19.19
     optional: true
 
   agent-base@7.1.4: {}
@@ -2176,9 +2176,9 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  inquirer@9.3.8(@types/node@22.19.15):
+  inquirer@9.3.8(@types/node@22.19.19):
     dependencies:
-      '@inquirer/external-editor': 1.0.3(@types/node@22.19.15)
+      '@inquirer/external-editor': 1.0.3(@types/node@22.19.19)
       '@inquirer/figures': 1.0.15
       ansi-escapes: 4.3.2
       cli-width: 4.1.0
