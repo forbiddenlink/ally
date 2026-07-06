@@ -70,10 +70,10 @@
     "url": "https://github.com/forbiddenlink/ally/issues"
   },
   "dependencies": {
-    "@axe-core/puppeteer": "^4.11.3",
+    "@axe-core/puppeteer": "^4.12.1",
     "@clack/prompts": "^1.6.0",
-    "@oclif/core": "^4.11.11",
-    "@oclif/plugin-help": "^6.2.52",
+    "@oclif/core": "^4.11.14",
+    "@oclif/plugin-help": "^6.2.53",
     "@octokit/rest": "^22.0.1",
     "axe-core": "^4.12.1",
     "boxen": "^8.0.1",
@@ -81,20 +81,20 @@
     "cli-progress": "^3.12.0",
     "commander": "^15.0.0",
     "glob": "^13.0.6",
-    "inquirer": "^14.0.1",
+    "inquirer": "^14.0.2",
     "ora": "^8.2.0",
     "pa11y": "^9.1.1",
-    "puppeteer": "^25.1.0",
+    "puppeteer": "^25.2.1",
     "simple-git": "^3.36.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.1",
+    "@biomejs/biome": "^2.5.2",
     "@types/cli-progress": "^3.11.6",
     "@types/inquirer": "^9.0.10",
     "@types/node": "^25.9.4",
     "@types/pa11y": "^5.3.7",
     "c8": "^11.0.0",
-    "tsx": "^4.22.4",
+    "tsx": "^4.22.5",
     "typescript": "^6.0.3"
   },
   "engines": {
