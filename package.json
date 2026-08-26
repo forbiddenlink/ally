@@ -91,11 +91,11 @@
     "@biomejs/biome": "^2.5.2",
     "@types/cli-progress": "^3.11.6",
     "@types/inquirer": "^9.0.10",
-    "@types/node": "^25.9.4",
+    "@types/node": "^26.1.1",
     "@types/pa11y": "^5.3.7",
     "c8": "^11.0.0",
     "tsx": "^4.22.5",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=20.17.0"
