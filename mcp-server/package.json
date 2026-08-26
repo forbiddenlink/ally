@@ -12,7 +12,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "apca-w3": "^0.1.9",
     "glob": "^13.0.6",
     "zod": "^4.4.3"
