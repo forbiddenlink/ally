@@ -6,40 +6,43 @@
  * Scans, explains, and fixes accessibility issues using GitHub Copilot CLI.
  */
 
-import { Command } from 'commander';
-import { createRequire } from 'module';
-import { handleErrorWithEnhancement } from './utils/enhanced-errors.js';
+import { Command } from 'commander'
+import { createRequire } from 'module'
+import { handleErrorWithEnhancement } from './utils/enhanced-errors.js'
 
 // Read version from package.json to stay in sync
-const require = createRequire(import.meta.url);
-const { version } = require('../package.json');
-import { scanCommand } from './commands/scan.js';
-import { explainCommand } from './commands/explain.js';
-import { fixCommand } from './commands/fix.js';
-import { reportCommand } from './commands/report.js';
-import { initCommand } from './commands/init.js';
-import { statsCommand } from './commands/stats.js';
-import { badgeCommand } from './commands/badge.js';
-import { watchCommand } from './commands/watch.js';
-import { learnCommand } from './commands/learn.js';
-import { crawlCommand } from './commands/crawl.js';
-import { treeCommand } from './commands/tree.js';
-import { triageCommand } from './commands/triage.js';
-import { prCheckCommand } from './commands/pr-check.js';
-import { completionCommand } from './commands/completion.js';
-import { doctorCommand } from './commands/doctor.js';
-import { healthCommand } from './commands/health.js';
-import { scanStorybookCommand } from './commands/scan-storybook.js';
-import { auditPaletteCommand } from './commands/audit-palette.js';
+const require = createRequire(import.meta.url)
+const { version } = require('../package.json')
 
-const program = new Command();
+import { auditPaletteCommand } from './commands/audit-palette.js'
+import { badgeCommand } from './commands/badge.js'
+import { completionCommand } from './commands/completion.js'
+import { crawlCommand } from './commands/crawl.js'
+import { doctorCommand } from './commands/doctor.js'
+import { explainCommand } from './commands/explain.js'
+import { fixCommand } from './commands/fix.js'
+import { healthCommand } from './commands/health.js'
+import { initCommand } from './commands/init.js'
+import { learnCommand } from './commands/learn.js'
+import { prCheckCommand } from './commands/pr-check.js'
+import { reportCommand } from './commands/report.js'
+import { scanCommand } from './commands/scan.js'
+import { scanStorybookCommand } from './commands/scan-storybook.js'
+import { statsCommand } from './commands/stats.js'
+import { treeCommand } from './commands/tree.js'
+import { triageCommand } from './commands/triage.js'
+import { watchCommand } from './commands/watch.js'
+
+const program = new Command()
 
 program
   .name('ally')
-  .description('Your codebase\'s accessibility ally. Scans, explains, and fixes a11y issues using GitHub Copilot CLI.')
+  .description(
+    "Your codebase's accessibility ally. Scans, explains, and fixes a11y issues using GitHub Copilot CLI."
+  )
   .version(version)
   .showSuggestionAfterError(true)
-  .showHelpAfterError('(add --help for additional information)');
+  .showHelpAfterError('(add --help for additional information)')
 
 // ally scan [path]
 program
@@ -52,103 +55,136 @@ program
   .option('-v, --verbose', 'Show all violations including minor ones')
   .option('-t, --threshold <number>', 'Exit with error if violations exceed threshold (for CI)')
   .option('--ci', 'CI mode: minimal output, exit code based on violations')
-  .option('-F, --fail-on <severities>', 'Fail only on specified severities (comma-separated: critical,serious,moderate,minor)')
-  .option('-S, --simulate <type>', 'Simulate color blindness (deuteranopia, protanopia, tritanopia)', (value: string) => {
-    const valid = ['deuteranopia', 'protanopia', 'tritanopia'];
-    if (!valid.includes(value)) {
-      throw new Error(`Invalid simulation type: ${value}. Valid options: ${valid.join(', ')}`);
+  .option(
+    '-F, --fail-on <severities>',
+    'Fail only on specified severities (comma-separated: critical,serious,moderate,minor)'
+  )
+  .option(
+    '-S, --simulate <type>',
+    'Simulate color blindness (deuteranopia, protanopia, tritanopia)',
+    (value: string) => {
+      const valid = ['deuteranopia', 'protanopia', 'tritanopia']
+      if (!valid.includes(value)) {
+        throw new Error(`Invalid simulation type: ${value}. Valid options: ${valid.join(', ')}`)
+      }
+      return value
     }
-    return value;
-  })
-  .option('-s, --standard <level>', 'WCAG standard to test against (default: wcag22aa)', (value: string) => {
-    const valid = ['wcag2a', 'wcag2aa', 'wcag2aaa', 'wcag21a', 'wcag21aa', 'wcag21aaa', 'wcag22aa', 'section508', 'best-practice'];
-    if (!valid.includes(value)) {
-      throw new Error(`Invalid standard: ${value}. Valid options: ${valid.join(', ')}`);
+  )
+  .option(
+    '-s, --standard <level>',
+    'WCAG standard to test against (default: wcag22aa)',
+    (value: string) => {
+      const valid = [
+        'wcag2a',
+        'wcag2aa',
+        'wcag2aaa',
+        'wcag21a',
+        'wcag21aa',
+        'wcag21aaa',
+        'wcag22aa',
+        'section508',
+        'best-practice',
+      ]
+      if (!valid.includes(value)) {
+        throw new Error(`Invalid standard: ${value}. Valid options: ${valid.join(', ')}`)
+      }
+      return value
     }
-    return value;
-  })
+  )
   .option('-T, --timeout <ms>', 'Page load timeout in milliseconds (default: 30000)')
-  .option('-B, --browser <browser>', 'Browser engine: chromium, firefox, webkit (default: chromium)', (value: string) => {
-    const valid = ['chromium', 'firefox', 'webkit'];
-    if (!valid.includes(value)) {
-      throw new Error(`Invalid browser: ${value}. Valid options: ${valid.join(', ')}`);
+  .option(
+    '-B, --browser <browser>',
+    'Browser engine: chromium, firefox, webkit (default: chromium)',
+    (value: string) => {
+      const valid = ['chromium', 'firefox', 'webkit']
+      if (!valid.includes(value)) {
+        throw new Error(`Invalid browser: ${value}. Valid options: ${valid.join(', ')}`)
+      }
+      return value
     }
-    return value;
-  })
-  .option('--experimental-apca', 'Show APCA Lc values alongside WCAG 2.x contrast ratios (experimental)')
+  )
+  .option(
+    '--experimental-apca',
+    'Show APCA Lc values alongside WCAG 2.x contrast ratios (experimental)'
+  )
   .option('--max-files <number>', 'Limit scan to first N files (useful for large projects)')
   .option('--baseline', 'Set current scan as accessibility baseline (for regression detection)')
   .option('--compare-baseline', 'Compare against saved baseline and show improvements/regressions')
-  .option('--fail-on-regression', 'Exit with error if accessibility regressions detected (with --compare-baseline)')
+  .option(
+    '--fail-on-regression',
+    'Exit with error if accessibility regressions detected (with --compare-baseline)'
+  )
   .option('--no-cache', 'Do not use cache, rescan all files')
   .option('--pierce-shadow', 'Enable enhanced Shadow DOM and iframe scanning')
   .action(async (path: string | undefined, options) => {
     try {
       // Parse timeout if provided
       if (options.timeout !== undefined) {
-        const timeout = parseInt(options.timeout, 10);
+        const timeout = parseInt(options.timeout, 10)
         if (isNaN(timeout) || timeout < 1000) {
-          console.error('Error: --timeout must be at least 1000 (1 second)');
-          process.exit(1);
+          console.error('Error: --timeout must be at least 1000 (1 second)')
+          process.exit(1)
         }
-        options.timeout = timeout;
+        options.timeout = timeout
       }
       // Parse threshold if provided
       if (options.threshold !== undefined) {
-        const threshold = parseInt(options.threshold, 10);
+        const threshold = parseInt(options.threshold, 10)
         if (isNaN(threshold) || threshold < 0) {
-          console.error('Error: --threshold must be a non-negative number');
-          process.exit(1);
+          console.error('Error: --threshold must be a non-negative number')
+          process.exit(1)
         }
-        options.threshold = threshold;
+        options.threshold = threshold
       }
       // Parse max-files if provided
       if (options.maxFiles !== undefined) {
-        const maxFiles = parseInt(options.maxFiles, 10);
+        const maxFiles = parseInt(options.maxFiles, 10)
         if (isNaN(maxFiles) || maxFiles < 1) {
-          console.error('Error: --max-files must be at least 1');
-          process.exit(1);
+          console.error('Error: --max-files must be at least 1')
+          process.exit(1)
         }
-        options.maxFiles = maxFiles;
+        options.maxFiles = maxFiles
       }
-      const report = await scanCommand(path, options);
+      const report = await scanCommand(path, options)
 
       // CI threshold check
       if (options.threshold !== undefined && report) {
         // If --fail-on is set, filter violations before checking threshold
-        let violationCount: number;
+        let violationCount: number
         if (options.failOn) {
-          const severities = options.failOn.split(',').map((s: string) => s.trim().toLowerCase());
-          const validSeverities = ['critical', 'serious', 'moderate', 'minor'];
-          const invalidSeverities = severities.filter((s: string) => !validSeverities.includes(s));
+          const severities = options.failOn.split(',').map((s: string) => s.trim().toLowerCase())
+          const validSeverities = ['critical', 'serious', 'moderate', 'minor']
+          const invalidSeverities = severities.filter((s: string) => !validSeverities.includes(s))
           if (invalidSeverities.length > 0) {
-            console.error(`Error: Invalid severity values: ${invalidSeverities.join(', ')}`);
-            console.error(`Valid values are: ${validSeverities.join(', ')}`);
-            process.exit(1);
+            console.error(`Error: Invalid severity values: ${invalidSeverities.join(', ')}`)
+            console.error(`Valid values are: ${validSeverities.join(', ')}`)
+            process.exit(1)
           }
           // Count violations matching specified severities
           violationCount = report.results.reduce((count, result) => {
-            return count + result.violations.filter(v => severities.includes(v.impact)).length;
-          }, 0);
+            return count + result.violations.filter((v) => severities.includes(v.impact)).length
+          }, 0)
         } else {
-          violationCount = report.summary.totalViolations;
+          violationCount = report.summary.totalViolations
         }
 
         if (violationCount > options.threshold) {
-          const severityNote = options.failOn ? ` (filtered by: ${options.failOn})` : '';
-          console.error(`\nCI FAILED: ${violationCount} violations${severityNote} exceed threshold of ${options.threshold}`);
-          process.exit(1);
+          const severityNote = options.failOn ? ` (filtered by: ${options.failOn})` : ''
+          console.error(
+            `\nCI FAILED: ${violationCount} violations${severityNote} exceed threshold of ${options.threshold}`
+          )
+          process.exit(1)
         }
       }
     } catch (error) {
       if (error instanceof Error) {
-        handleErrorWithEnhancement(error);
+        handleErrorWithEnhancement(error)
       } else {
-        console.error('Scan failed:', error);
+        console.error('Scan failed:', error)
       }
-      process.exit(1);
+      process.exit(1)
     }
-  });
+  })
 
 // ally explain
 program
@@ -160,20 +196,20 @@ program
   .option('--ai', 'Use GitHub Copilot CLI for AI-powered explanations')
   .action(async (options) => {
     try {
-      const limit = parseInt(options.limit, 10);
+      const limit = parseInt(options.limit, 10)
       if (isNaN(limit) || limit < 1) {
-        console.error('Error: --limit must be a positive number');
-        process.exit(1);
+        console.error('Error: --limit must be a positive number')
+        process.exit(1)
       }
       await explainCommand({
         ...options,
         limit,
-      });
+      })
     } catch (error) {
-      console.error('Explain failed:', error);
-      process.exit(1);
+      console.error('Explain failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally fix
 program
@@ -187,12 +223,12 @@ program
   .option('--ai-alt', 'Use AI (OpenAI Vision) to generate meaningful alt text for images')
   .action(async (options) => {
     try {
-      await fixCommand(options);
+      await fixCommand(options)
     } catch (error) {
-      console.error('Fix failed:', error);
-      process.exit(1);
+      console.error('Fix failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally report
 program
@@ -200,7 +236,11 @@ program
   .description('Generate accessibility report (ACCESSIBILITY.md)')
   .option('-i, --input <file>', 'Path to scan results', '.ally/scan.json')
   .option('-o, --output <file>', 'Output file path', 'ACCESSIBILITY.md')
-  .option('-f, --format <type>', 'Report format (markdown, json, html, sarif, junit, csv, vpat, all)', 'markdown')
+  .option(
+    '-f, --format <type>',
+    'Report format (markdown, json, html, sarif, junit, csv, vpat, all)',
+    'markdown'
+  )
   .option('--product-name <name>', 'Product name for VPAT report')
   .option('--product-version <version>', 'Product version for VPAT report')
   .option('--vendor <name>', 'Vendor/company name for VPAT report')
@@ -208,12 +248,12 @@ program
   .option('--eval-date <date>', 'Evaluation date for VPAT report (YYYY-MM-DD)')
   .action(async (options) => {
     try {
-      await reportCommand(options);
+      await reportCommand(options)
     } catch (error) {
-      console.error('Report generation failed:', error);
-      process.exit(1);
+      console.error('Report generation failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally init
 program
@@ -223,12 +263,12 @@ program
   .option('-H, --hooks', 'Set up pre-commit hooks for accessibility checks')
   .action(async (options) => {
     try {
-      await initCommand(options);
+      await initCommand(options)
     } catch (error) {
-      console.error('Initialization failed:', error);
-      process.exit(1);
+      console.error('Initialization failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally stats
 program
@@ -236,12 +276,12 @@ program
   .description('Show accessibility progress dashboard')
   .action(async () => {
     try {
-      await statsCommand();
+      await statsCommand()
     } catch (error) {
-      console.error('Stats failed:', error);
-      process.exit(1);
+      console.error('Stats failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally history
 program
@@ -252,14 +292,14 @@ program
   .option('-v, --verbose', 'Show detailed information')
   .action(async (options) => {
     try {
-      const { historyCommand } = await import('./commands/history.js');
-      const limit = parseInt(options.limit, 10);
-      await historyCommand({ limit, branch: options.branch, verbose: options.verbose });
+      const { historyCommand } = await import('./commands/history.js')
+      const limit = parseInt(options.limit, 10)
+      await historyCommand({ limit, branch: options.branch, verbose: options.verbose })
     } catch (error) {
-      console.error('History failed:', error);
-      process.exit(1);
+      console.error('History failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally badge
 program
@@ -270,12 +310,12 @@ program
   .option('-o, --output <file>', 'Save badge to file (primarily for SVG)')
   .action(async (options) => {
     try {
-      await badgeCommand(options);
+      await badgeCommand(options)
     } catch (error) {
-      console.error('Badge generation failed:', error);
-      process.exit(1);
+      console.error('Badge generation failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally watch
 program
@@ -286,20 +326,20 @@ program
   .option('--fix-on-save', 'Automatically apply high-confidence fixes (≥90%) when files change')
   .action(async (path: string | undefined, options) => {
     try {
-      const debounce = parseInt(options.debounce, 10);
+      const debounce = parseInt(options.debounce, 10)
       if (isNaN(debounce) || debounce < 0) {
-        console.error('Error: --debounce must be a non-negative number');
-        process.exit(1);
+        console.error('Error: --debounce must be a non-negative number')
+        process.exit(1)
       }
       await watchCommand(path, {
         ...options,
         debounce,
-      });
+      })
     } catch (error) {
-      console.error('Watch failed:', error);
-      process.exit(1);
+      console.error('Watch failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally learn
 program
@@ -308,12 +348,12 @@ program
   .option('-l, --list', 'List all known violation types')
   .action(async (violationId: string | undefined, options) => {
     try {
-      await learnCommand(violationId, options);
+      await learnCommand(violationId, options)
     } catch (error) {
-      console.error('Learn failed:', error);
-      process.exit(1);
+      console.error('Learn failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally crawl
 program
@@ -327,16 +367,16 @@ program
   .action(async (url: string, options) => {
     try {
       // Parse numeric options
-      const depth = parseInt(options.depth, 10);
+      const depth = parseInt(options.depth, 10)
       if (isNaN(depth) || depth < 0) {
-        console.error('Error: --depth must be a non-negative number');
-        process.exit(1);
+        console.error('Error: --depth must be a non-negative number')
+        process.exit(1)
       }
 
-      const limit = parseInt(options.limit, 10);
+      const limit = parseInt(options.limit, 10)
       if (isNaN(limit) || limit < 1) {
-        console.error('Error: --limit must be a positive number');
-        process.exit(1);
+        console.error('Error: --limit must be a positive number')
+        process.exit(1)
       }
 
       await crawlCommand(url, {
@@ -344,12 +384,12 @@ program
         limit,
         sameOrigin: options.sameOrigin,
         output: options.output,
-      });
+      })
     } catch (error) {
-      console.error('Crawl failed:', error);
-      process.exit(1);
+      console.error('Crawl failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally tree
 program
@@ -362,10 +402,10 @@ program
   .option('--no-audio', 'Print announcement but skip TTS playback (use with --speak)')
   .action(async (url: string, options) => {
     try {
-      const depth = parseInt(options.depth, 10);
+      const depth = parseInt(options.depth, 10)
       if (isNaN(depth) || depth < 1) {
-        console.error('Error: --depth must be a positive number');
-        process.exit(1);
+        console.error('Error: --depth must be a positive number')
+        process.exit(1)
       }
 
       await treeCommand(url, {
@@ -374,12 +414,12 @@ program
         json: options.json,
         speak: options.speak,
         noAudio: !options.audio, // Commander converts --no-audio to audio: false
-      });
+      })
     } catch (error) {
-      console.error('Tree failed:', error);
-      process.exit(1);
+      console.error('Tree failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally triage
 program
@@ -388,12 +428,12 @@ program
   .option('-i, --input <file>', 'Path to scan results', '.ally/scan.json')
   .action(async (options) => {
     try {
-      await triageCommand(options);
+      await triageCommand(options)
     } catch (error) {
-      console.error('Triage failed:', error);
-      process.exit(1);
+      console.error('Triage failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally pr-check
 program
@@ -405,16 +445,16 @@ program
   .option('-F, --fail-on <severities>', 'Fail on specified severities (comma-separated)')
   .action(async (options) => {
     try {
-      const prNumber = options.pr ? parseInt(options.pr, 10) : undefined;
+      const prNumber = options.pr ? parseInt(options.pr, 10) : undefined
       await prCheckCommand({
         ...options,
         pr: prNumber,
-      });
+      })
     } catch (error) {
-      console.error('PR check failed:', error);
-      process.exit(1);
+      console.error('PR check failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally completion
 program
@@ -422,12 +462,12 @@ program
   .description('Generate shell completion script (bash, zsh, fish)')
   .action(async (shell: string | undefined) => {
     try {
-      await completionCommand(shell);
+      await completionCommand(shell)
     } catch (error) {
-      console.error('Completion failed:', error);
-      process.exit(1);
+      console.error('Completion failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally doctor
 program
@@ -435,65 +475,97 @@ program
   .description('Diagnose installation and configuration issues')
   .action(async () => {
     try {
-      await doctorCommand();
+      await doctorCommand()
     } catch (error) {
-      console.error('Doctor failed:', error);
-      process.exit(1);
+      console.error('Doctor failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally health
 program
   .command('health')
   .description('Quick accessibility health check (like npm audit)')
   .option('-p, --path <path>', 'Path to scan', '.')
-  .option('-s, --standard <level>', 'WCAG standard to test against (default: wcag22aa)', (value: string) => {
-    const valid = ['wcag2a', 'wcag2aa', 'wcag2aaa', 'wcag21a', 'wcag21aa', 'wcag21aaa', 'wcag22aa', 'section508', 'best-practice'];
-    if (!valid.includes(value)) {
-      throw new Error(`Invalid standard: ${value}. Valid options: ${valid.join(', ')}`);
+  .option(
+    '-s, --standard <level>',
+    'WCAG standard to test against (default: wcag22aa)',
+    (value: string) => {
+      const valid = [
+        'wcag2a',
+        'wcag2aa',
+        'wcag2aaa',
+        'wcag21a',
+        'wcag21aa',
+        'wcag21aaa',
+        'wcag22aa',
+        'section508',
+        'best-practice',
+      ]
+      if (!valid.includes(value)) {
+        throw new Error(`Invalid standard: ${value}. Valid options: ${valid.join(', ')}`)
+      }
+      return value
     }
-    return value;
-  })
+  )
   .option('-i, --input <file>', 'Use existing scan results instead of scanning')
   .action(async (options) => {
     try {
-      await healthCommand(options);
+      await healthCommand(options)
     } catch (error) {
-      console.error('Health check failed:', error);
-      process.exit(1);
+      console.error('Health check failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally scan-storybook
 program
   .command('scan-storybook')
   .description('Scan Storybook stories for accessibility issues')
-  .option('-u, --url <url>', 'Storybook URL (default: http://localhost:6006)', 'http://localhost:6006')
+  .option(
+    '-u, --url <url>',
+    'Storybook URL (default: http://localhost:6006)',
+    'http://localhost:6006'
+  )
   .option('-T, --timeout <ms>', 'Page load timeout in milliseconds (default: 10000)', '10000')
   .option('-f, --filter <pattern>', 'Filter stories by name pattern')
   .option('-F, --format <format>', 'Output format (default, json, csv)', 'default')
   .option('-o, --output <dir>', 'Output directory for results', '.ally')
-  .option('-s, --standard <level>', 'WCAG standard to test against (default: wcag22aa)', (value: string) => {
-    const valid = ['wcag2a', 'wcag2aa', 'wcag2aaa', 'wcag21a', 'wcag21aa', 'wcag21aaa', 'wcag22aa', 'section508', 'best-practice'];
-    if (!valid.includes(value)) {
-      throw new Error(`Invalid standard: ${value}. Valid options: ${valid.join(', ')}`);
+  .option(
+    '-s, --standard <level>',
+    'WCAG standard to test against (default: wcag22aa)',
+    (value: string) => {
+      const valid = [
+        'wcag2a',
+        'wcag2aa',
+        'wcag2aaa',
+        'wcag21a',
+        'wcag21aa',
+        'wcag21aaa',
+        'wcag22aa',
+        'section508',
+        'best-practice',
+      ]
+      if (!valid.includes(value)) {
+        throw new Error(`Invalid standard: ${value}. Valid options: ${valid.join(', ')}`)
+      }
+      return value
     }
-    return value;
-  })
+  )
   .action(async (options) => {
     try {
       // Parse timeout if provided
-      const timeout = parseInt(options.timeout, 10);
+      const timeout = parseInt(options.timeout, 10)
       if (isNaN(timeout) || timeout < 1000) {
-        console.error('Error: --timeout must be at least 1000 (1 second)');
-        process.exit(1);
+        console.error('Error: --timeout must be at least 1000 (1 second)')
+        process.exit(1)
       }
 
       // Validate format
-      const validFormats = ['default', 'json', 'csv'];
+      const validFormats = ['default', 'json', 'csv']
       if (!validFormats.includes(options.format)) {
-        console.error(`Error: --format must be one of: ${validFormats.join(', ')}`);
-        process.exit(1);
+        console.error(`Error: --format must be one of: ${validFormats.join(', ')}`)
+        process.exit(1)
       }
 
       await scanStorybookCommand({
@@ -503,12 +575,12 @@ program
         format: options.format,
         output: options.output,
         standard: options.standard,
-      });
+      })
     } catch (error) {
-      console.error('Storybook scan failed:', error);
-      process.exit(1);
+      console.error('Storybook scan failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // ally audit-palette
 program
@@ -521,17 +593,17 @@ program
   .action(async (file: string, options) => {
     try {
       // Validate level
-      const validLevels = ['aa', 'aaa'];
+      const validLevels = ['aa', 'aaa']
       if (!validLevels.includes(options.level)) {
-        console.error(`Error: --level must be one of: ${validLevels.join(', ')}`);
-        process.exit(1);
+        console.error(`Error: --level must be one of: ${validLevels.join(', ')}`)
+        process.exit(1)
       }
 
       // Validate format
-      const validFormats = ['default', 'json', 'csv'];
+      const validFormats = ['default', 'json', 'csv']
       if (!validFormats.includes(options.format)) {
-        console.error(`Error: --format must be one of: ${validFormats.join(', ')}`);
-        process.exit(1);
+        console.error(`Error: --format must be one of: ${validFormats.join(', ')}`)
+        process.exit(1)
       }
 
       await auditPaletteCommand(file, {
@@ -539,12 +611,12 @@ program
         level: options.level,
         largeText: options.largeText,
         apca: options.apca,
-      });
+      })
     } catch (error) {
-      console.error('Palette audit failed:', error);
-      process.exit(1);
+      console.error('Palette audit failed:', error)
+      process.exit(1)
     }
-  });
+  })
 
 // Parse and run
-program.parse();
+program.parse()

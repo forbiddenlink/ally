@@ -2,13 +2,35 @@
  * ally completion command - Generate shell completion scripts
  */
 
-type Shell = 'bash' | 'zsh' | 'fish';
+type Shell = 'bash' | 'zsh' | 'fish'
 
 // All commands and their options for completion
 const COMMANDS = {
   scan: {
     description: 'Scan files for accessibility violations',
-    options: ['-o', '--output', '-u', '--url', '-j', '--json', '-f', '--format', '-v', '--verbose', '-t', '--threshold', '--ci', '-F', '--fail-on', '-S', '--simulate', '-s', '--standard', '-T', '--timeout'],
+    options: [
+      '-o',
+      '--output',
+      '-u',
+      '--url',
+      '-j',
+      '--json',
+      '-f',
+      '--format',
+      '-v',
+      '--verbose',
+      '-t',
+      '--threshold',
+      '--ci',
+      '-F',
+      '--fail-on',
+      '-S',
+      '--simulate',
+      '-s',
+      '--standard',
+      '-T',
+      '--timeout',
+    ],
   },
   explain: {
     description: 'Get plain-language explanations of violations',
@@ -44,7 +66,16 @@ const COMMANDS = {
   },
   crawl: {
     description: 'Crawl website and scan each page',
-    options: ['-d', '--depth', '-l', '--limit', '--same-origin', '--no-same-origin', '-o', '--output'],
+    options: [
+      '-d',
+      '--depth',
+      '-l',
+      '--limit',
+      '--same-origin',
+      '--no-same-origin',
+      '-o',
+      '--output',
+    ],
   },
   tree: {
     description: 'Display accessibility tree for a URL',
@@ -62,9 +93,9 @@ const COMMANDS = {
     description: 'Generate shell completion script',
     options: [],
   },
-};
+}
 
-const commandNames = Object.keys(COMMANDS);
+const commandNames = Object.keys(COMMANDS)
 
 function generateBashCompletion(): string {
   return `# Bash completion for ally
@@ -87,16 +118,20 @@ _ally_completions() {
 
     # Complete options based on command
     case "\${COMP_WORDS[1]}" in
-${Object.entries(COMMANDS).map(([cmd, info]) => `        ${cmd})
+${Object.entries(COMMANDS)
+  .map(
+    ([cmd, info]) => `        ${cmd})
             COMPREPLY=( $(compgen -W "${info.options.join(' ')}" -- "\${cur}") )
-            ;;`).join('\n')}
+            ;;`
+  )
+  .join('\n')}
     esac
 
     return 0
 }
 
 complete -F _ally_completions ally
-`;
+`
 }
 
 function generateZshCompletion(): string {
@@ -108,7 +143,9 @@ function generateZshCompletion(): string {
 _ally() {
     local -a commands
     commands=(
-${Object.entries(COMMANDS).map(([cmd, info]) => `        '${cmd}:${info.description}'`).join('\n')}
+${Object.entries(COMMANDS)
+  .map(([cmd, info]) => `        '${cmd}:${info.description}'`)
+  .join('\n')}
     )
 
     _arguments -C \\
@@ -121,17 +158,26 @@ ${Object.entries(COMMANDS).map(([cmd, info]) => `        '${cmd}:${info.descript
             ;;
         options)
             case $words[1] in
-${Object.entries(COMMANDS).map(([cmd, info]) => `                ${cmd})
+${Object.entries(COMMANDS)
+  .map(
+    ([cmd, info]) => `                ${cmd})
                     _arguments \\
-${info.options.filter(o => o.startsWith('--')).map(opt => `                        '${opt}[${opt.replace('--', '')}]'`).join(' \\\n') || "                        '*:'"}
-                    ;;`).join('\n')}
+${
+  info.options
+    .filter((o) => o.startsWith('--'))
+    .map((opt) => `                        '${opt}[${opt.replace('--', '')}]'`)
+    .join(' \\\n') || "                        '*:'"
+}
+                    ;;`
+  )
+  .join('\n')}
             esac
             ;;
     esac
 }
 
 compdef _ally ally
-`;
+`
 }
 
 function generateFishCompletion(): string {
@@ -143,19 +189,31 @@ function generateFishCompletion(): string {
 complete -c ally -f
 
 # Commands
-${Object.entries(COMMANDS).map(([cmd, info]) => `complete -c ally -n "__fish_use_subcommand" -a "${cmd}" -d "${info.description}"`).join('\n')}
+${Object.entries(COMMANDS)
+  .map(
+    ([cmd, info]) =>
+      `complete -c ally -n "__fish_use_subcommand" -a "${cmd}" -d "${info.description}"`
+  )
+  .join('\n')}
 
 # Options for each command
-${Object.entries(COMMANDS).map(([cmd, info]) =>
-  info.options.filter(o => o.startsWith('--')).map(opt =>
-    `complete -c ally -n "__fish_seen_subcommand_from ${cmd}" -l "${opt.replace('--', '')}" -d "${opt.replace('--', '')}"`
-  ).join('\n')
-).filter(Boolean).join('\n')}
-`;
+${Object.entries(COMMANDS)
+  .map(([cmd, info]) =>
+    info.options
+      .filter((o) => o.startsWith('--'))
+      .map(
+        (opt) =>
+          `complete -c ally -n "__fish_seen_subcommand_from ${cmd}" -l "${opt.replace('--', '')}" -d "${opt.replace('--', '')}"`
+      )
+      .join('\n')
+  )
+  .filter(Boolean)
+  .join('\n')}
+`
 }
 
 export async function completionCommand(shell?: string): Promise<void> {
-  const validShells: Shell[] = ['bash', 'zsh', 'fish'];
+  const validShells: Shell[] = ['bash', 'zsh', 'fish']
 
   if (!shell) {
     console.log(`Usage: ally completion <shell>
@@ -176,25 +234,25 @@ Examples:
 
   # Fish - save to completions directory
   ally completion fish > ~/.config/fish/completions/ally.fish
-`);
-    return;
+`)
+    return
   }
 
   if (!validShells.includes(shell as Shell)) {
-    console.error(`Unknown shell: ${shell}`);
-    console.error(`Supported shells: ${validShells.join(', ')}`);
-    process.exit(1);
+    console.error(`Unknown shell: ${shell}`)
+    console.error(`Supported shells: ${validShells.join(', ')}`)
+    process.exit(1)
   }
 
   switch (shell as Shell) {
     case 'bash':
-      console.log(generateBashCompletion());
-      break;
+      console.log(generateBashCompletion())
+      break
     case 'zsh':
-      console.log(generateZshCompletion());
-      break;
+      console.log(generateZshCompletion())
+      break
     case 'fish':
-      console.log(generateFishCompletion());
-      break;
+      console.log(generateFishCompletion())
+      break
   }
 }

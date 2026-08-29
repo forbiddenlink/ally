@@ -2,24 +2,18 @@
  * ally badge command - Generates accessibility score badges for README files
  */
 
-import { readFile, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import { resolve } from 'path';
-import {
-  printBanner,
-  createSpinner,
-  printError,
-  printSuccess,
-  printInfo,
-} from '../utils/ui.js';
-import type { AllyReport } from '../types/index.js';
+import { existsSync } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
+import { resolve } from 'path'
+import type { AllyReport } from '../types/index.js'
+import { createSpinner, printBanner, printError, printInfo, printSuccess } from '../utils/ui.js'
 
-type BadgeFormat = 'url' | 'markdown' | 'svg';
+type BadgeFormat = 'url' | 'markdown' | 'svg'
 
 interface BadgeOptions {
-  input?: string;
-  format?: BadgeFormat;
-  output?: string;
+  input?: string
+  format?: BadgeFormat
+  output?: string
 }
 
 /**
@@ -30,52 +24,52 @@ interface BadgeOptions {
  * - red (<40)
  */
 function getScoreColor(score: number): string {
-  if (score >= 80) return 'green';
-  if (score >= 60) return 'yellow';
-  if (score >= 40) return 'orange';
-  return 'red';
+  if (score >= 80) return 'green'
+  if (score >= 60) return 'yellow'
+  if (score >= 40) return 'orange'
+  return 'red'
 }
 
 /**
  * Get hex color for SVG badge based on score
  */
 function getScoreHexColor(score: number): string {
-  if (score >= 80) return '#4c1';     // green
-  if (score >= 60) return '#dfb317';  // yellow
-  if (score >= 40) return '#fe7d37';  // orange
-  return '#e05d44';                   // red
+  if (score >= 80) return '#4c1' // green
+  if (score >= 60) return '#dfb317' // yellow
+  if (score >= 40) return '#fe7d37' // orange
+  return '#e05d44' // red
 }
 
 /**
  * Generate shields.io badge URL
  */
 function generateBadgeUrl(score: number): string {
-  const color = getScoreColor(score);
-  const encodedLabel = encodeURIComponent('a11y score');
-  const encodedValue = encodeURIComponent(`${score}%`);
-  return `https://img.shields.io/badge/${encodedLabel}-${encodedValue}-${color}`;
+  const color = getScoreColor(score)
+  const encodedLabel = encodeURIComponent('a11y score')
+  const encodedValue = encodeURIComponent(`${score}%`)
+  return `https://img.shields.io/badge/${encodedLabel}-${encodedValue}-${color}`
 }
 
 /**
  * Generate markdown badge syntax
  */
 function generateMarkdownBadge(score: number): string {
-  const url = generateBadgeUrl(score);
-  return `![A11y Score](${url})`;
+  const url = generateBadgeUrl(score)
+  return `![A11y Score](${url})`
 }
 
 /**
  * Generate SVG badge content
  */
 function generateSvgBadge(score: number): string {
-  const color = getScoreHexColor(score);
-  const labelText = 'a11y score';
-  const valueText = `${score}%`;
+  const color = getScoreHexColor(score)
+  const labelText = 'a11y score'
+  const valueText = `${score}%`
 
   // Calculate widths (approximate character widths)
-  const labelWidth = labelText.length * 6.5 + 10;
-  const valueWidth = valueText.length * 7 + 10;
-  const totalWidth = labelWidth + valueWidth;
+  const labelWidth = labelText.length * 6.5 + 10
+  const valueWidth = valueText.length * 7 + 10
+  const totalWidth = labelWidth + valueWidth
 
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${totalWidth}" height="20" role="img" aria-label="${labelText}: ${valueText}">
   <title>${labelText}: ${valueText}</title>
@@ -97,76 +91,72 @@ function generateSvgBadge(score: number): string {
     <text aria-hidden="true" x="${(labelWidth + valueWidth / 2) * 10}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${(valueWidth - 10) * 10}">${valueText}</text>
     <text x="${(labelWidth + valueWidth / 2) * 10}" y="140" transform="scale(.1)" fill="#fff" textLength="${(valueWidth - 10) * 10}">${valueText}</text>
   </g>
-</svg>`;
+</svg>`
 }
 
 export async function badgeCommand(options: BadgeOptions = {}): Promise<void> {
-  printBanner();
+  printBanner()
 
-  const {
-    input = '.ally/scan.json',
-    format = 'url',
-    output,
-  } = options;
+  const { input = '.ally/scan.json', format = 'url', output } = options
 
   // Load scan results
-  const spinner = createSpinner('Loading scan results...');
-  spinner.start();
+  const spinner = createSpinner('Loading scan results...')
+  spinner.start()
 
-  const reportPath = resolve(input);
+  const reportPath = resolve(input)
 
   if (!existsSync(reportPath)) {
-    spinner.fail('No scan results found');
-    printError(`Run 'ally scan' first to generate accessibility report`);
-    return;
+    spinner.fail('No scan results found')
+    printError(`Run 'ally scan' first to generate accessibility report`)
+    return
   }
 
-  let report: AllyReport;
+  let report: AllyReport
   try {
-    const content = await readFile(reportPath, 'utf-8');
-    report = JSON.parse(content) as AllyReport;
-    spinner.succeed('Loaded scan results');
+    const content = await readFile(reportPath, 'utf-8')
+    report = JSON.parse(content) as AllyReport
+    spinner.succeed('Loaded scan results')
   } catch (error) {
-    spinner.fail('Failed to load scan results');
-    printError(error instanceof Error ? error.message : String(error));
-    return;
+    spinner.fail('Failed to load scan results')
+    printError(error instanceof Error ? error.message : String(error))
+    return
   }
 
-  const score = report.summary.score;
-  let badgeOutput: string;
+  const score = report.summary.score
+  let badgeOutput: string
 
   switch (format) {
     case 'markdown':
-      badgeOutput = generateMarkdownBadge(score);
-      break;
+      badgeOutput = generateMarkdownBadge(score)
+      break
     case 'svg':
-      badgeOutput = generateSvgBadge(score);
-      break;
+      badgeOutput = generateSvgBadge(score)
+      break
     case 'url':
     default:
-      badgeOutput = generateBadgeUrl(score);
+      badgeOutput = generateBadgeUrl(score)
   }
 
   // If output file specified (for SVG), write to file
   if (output) {
     if (format !== 'svg') {
-      printInfo('Note: --output option is primarily intended for SVG format');
+      printInfo('Note: --output option is primarily intended for SVG format')
     }
     try {
-      await writeFile(resolve(output), badgeOutput);
-      printSuccess(`Badge saved to: ${output}`);
+      await writeFile(resolve(output), badgeOutput)
+      printSuccess(`Badge saved to: ${output}`)
     } catch (error) {
-      printError(`Failed to write badge: ${error instanceof Error ? error.message : String(error)}`);
-      return;
+      printError(`Failed to write badge: ${error instanceof Error ? error.message : String(error)}`)
+      return
     }
   } else {
     // Print badge to console
-    console.log();
-    console.log(badgeOutput);
+    console.log()
+    console.log(badgeOutput)
   }
 
-  console.log();
-  printInfo(`Score: ${score}/100 (${getScoreColor(score)})`);
+  console.log()
+  printInfo(`Score: ${score}/100 (${getScoreColor(score)})`)
 }
 
-export default badgeCommand;
+export default badgeCommand

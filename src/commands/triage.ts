@@ -2,49 +2,49 @@
  * ally triage command - Interactive issue categorization and prioritization
  */
 
-import inquirer from 'inquirer';
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import { resolve, dirname } from 'path';
-import chalk from 'chalk';
-import boxen from 'boxen';
+import boxen from 'boxen'
+import chalk from 'chalk'
+import { existsSync } from 'fs'
+import { mkdir, readFile, writeFile } from 'fs/promises'
+import inquirer from 'inquirer'
+import { dirname, resolve } from 'path'
+import type { AllyReport, Severity, Violation } from '../types/index.js'
+import { suggestInit } from '../utils/errors.js'
 import {
-  printBanner,
   createSpinner,
+  printBanner,
   printError,
   printInfo,
   printSuccess,
   printWarning,
-} from '../utils/ui.js';
-import { suggestInit } from '../utils/errors.js';
-import type { AllyReport, Violation, Severity } from '../types/index.js';
+} from '../utils/ui.js'
 
 export interface TriageResult {
-  fix: string[];      // violations to fix now
-  ignore: string[];   // violations to ignore (add to .allyignore)
-  backlog: string[];  // violations to fix later
+  fix: string[] // violations to fix now
+  ignore: string[] // violations to ignore (add to .allyignore)
+  backlog: string[] // violations to fix later
 }
 
 interface ViolationGroup {
-  id: string;
-  description: string;
-  help: string;
-  helpUrl: string;
-  impact: Severity;
-  count: number;
-  tags: string[];
+  id: string
+  description: string
+  help: string
+  helpUrl: string
+  impact: Severity
+  count: number
+  tags: string[]
 }
 
 interface BacklogItem {
-  id: string;
-  description: string;
-  impact: Severity;
-  count: number;
-  addedAt: string;
+  id: string
+  description: string
+  impact: Severity
+  count: number
+  addedAt: string
 }
 
 interface TriageOptions {
-  input?: string;
+  input?: string
 }
 
 // Severity colors and icons for consistent display
@@ -53,47 +53,47 @@ const severityColors: Record<Severity, (text: string) => string> = {
   serious: chalk.red,
   moderate: chalk.yellow,
   minor: chalk.blue,
-};
+}
 
 const severityIcons: Record<Severity, string> = {
   critical: '!!!',
   serious: '!!',
   moderate: '!',
   minor: 'i',
-};
+}
 
 const severityLabels: Record<Severity, string> = {
   critical: 'CRITICAL',
   serious: 'SERIOUS',
   moderate: 'MODERATE',
   minor: 'MINOR',
-};
+}
 
 /**
  * Format a violation for display in the menu
  */
 function formatViolationChoice(group: ViolationGroup): string {
-  const color = severityColors[group.impact];
-  const icon = severityIcons[group.impact];
-  const label = severityLabels[group.impact];
+  const color = severityColors[group.impact]
+  const icon = severityIcons[group.impact]
+  const label = severityLabels[group.impact]
 
   // Format: [SEVERITY] id (N occurrences) - description
-  const occurrences = group.count === 1 ? '1 occurrence' : `${group.count} occurrences`;
-  return `${color(`[${icon}] ${label}`)} ${chalk.white(group.id)} ${chalk.dim(`(${occurrences})`)} - ${group.help}`;
+  const occurrences = group.count === 1 ? '1 occurrence' : `${group.count} occurrences`
+  return `${color(`[${icon}] ${label}`)} ${chalk.white(group.id)} ${chalk.dim(`(${occurrences})`)} - ${group.help}`
 }
 
 /**
  * Group violations by type/id and count occurrences
  */
 function groupViolationsByType(report: AllyReport): ViolationGroup[] {
-  const groupMap = new Map<string, ViolationGroup>();
+  const groupMap = new Map<string, ViolationGroup>()
 
   for (const result of report.results) {
     for (const violation of result.violations) {
-      const existing = groupMap.get(violation.id);
+      const existing = groupMap.get(violation.id)
       if (existing) {
         // Sum up all node occurrences
-        existing.count += violation.nodes.length;
+        existing.count += violation.nodes.length
       } else {
         groupMap.set(violation.id, {
           id: violation.id,
@@ -103,7 +103,7 @@ function groupViolationsByType(report: AllyReport): ViolationGroup[] {
           impact: violation.impact,
           count: violation.nodes.length,
           tags: violation.tags,
-        });
+        })
       }
     }
   }
@@ -114,32 +114,32 @@ function groupViolationsByType(report: AllyReport): ViolationGroup[] {
     serious: 1,
     moderate: 2,
     minor: 3,
-  };
+  }
 
   return Array.from(groupMap.values()).sort((a, b) => {
-    const severityDiff = severityOrder[a.impact] - severityOrder[b.impact];
-    if (severityDiff !== 0) return severityDiff;
-    return b.count - a.count;
-  });
+    const severityDiff = severityOrder[a.impact] - severityOrder[b.impact]
+    if (severityDiff !== 0) return severityDiff
+    return b.count - a.count
+  })
 }
 
 /**
  * Load existing .allyignore patterns
  */
 async function loadIgnorePatterns(): Promise<string[]> {
-  const ignorePath = resolve('.allyignore');
+  const ignorePath = resolve('.allyignore')
   if (!existsSync(ignorePath)) {
-    return [];
+    return []
   }
 
   try {
-    const content = await readFile(ignorePath, 'utf-8');
+    const content = await readFile(ignorePath, 'utf-8')
     return content
       .split('\n')
-      .map(line => line.trim())
-      .filter(line => line && !line.startsWith('#'));
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
   } catch {
-    return [];
+    return []
   }
 }
 
@@ -147,11 +147,11 @@ async function loadIgnorePatterns(): Promise<string[]> {
  * Save patterns to .allyignore
  */
 async function saveIgnorePatterns(patterns: string[]): Promise<void> {
-  const ignorePath = resolve('.allyignore');
-  const existingPatterns = await loadIgnorePatterns();
+  const ignorePath = resolve('.allyignore')
+  const existingPatterns = await loadIgnorePatterns()
 
   // Combine existing and new patterns, removing duplicates
-  const allPatterns = [...new Set([...existingPatterns, ...patterns])];
+  const allPatterns = [...new Set([...existingPatterns, ...patterns])]
 
   // Build file content with header
   const content = `# Ally accessibility ignore file
@@ -159,25 +159,25 @@ async function saveIgnorePatterns(patterns: string[]): Promise<void> {
 # Generated by ally triage
 
 ${allPatterns.join('\n')}
-`;
+`
 
-  await writeFile(ignorePath, content, 'utf-8');
+  await writeFile(ignorePath, content, 'utf-8')
 }
 
 /**
  * Load existing backlog
  */
 async function loadBacklog(): Promise<BacklogItem[]> {
-  const backlogPath = resolve('.ally', 'backlog.json');
+  const backlogPath = resolve('.ally', 'backlog.json')
   if (!existsSync(backlogPath)) {
-    return [];
+    return []
   }
 
   try {
-    const content = await readFile(backlogPath, 'utf-8');
-    return JSON.parse(content) as BacklogItem[];
+    const content = await readFile(backlogPath, 'utf-8')
+    return JSON.parse(content) as BacklogItem[]
   } catch {
-    return [];
+    return []
   }
 }
 
@@ -185,114 +185,116 @@ async function loadBacklog(): Promise<BacklogItem[]> {
  * Save backlog items
  */
 async function saveBacklog(items: BacklogItem[]): Promise<void> {
-  const backlogPath = resolve('.ally', 'backlog.json');
+  const backlogPath = resolve('.ally', 'backlog.json')
 
   // Ensure .ally directory exists
-  const dirPath = dirname(backlogPath);
+  const dirPath = dirname(backlogPath)
   if (!existsSync(dirPath)) {
-    await mkdir(dirPath, { recursive: true });
+    await mkdir(dirPath, { recursive: true })
   }
 
-  const existingBacklog = await loadBacklog();
+  const existingBacklog = await loadBacklog()
 
   // Merge with existing, updating counts for existing items
-  const backlogMap = new Map<string, BacklogItem>();
+  const backlogMap = new Map<string, BacklogItem>()
   for (const item of existingBacklog) {
-    backlogMap.set(item.id, item);
+    backlogMap.set(item.id, item)
   }
   for (const item of items) {
-    backlogMap.set(item.id, item);
+    backlogMap.set(item.id, item)
   }
 
-  await writeFile(backlogPath, JSON.stringify(Array.from(backlogMap.values()), null, 2), 'utf-8');
+  await writeFile(backlogPath, JSON.stringify(Array.from(backlogMap.values()), null, 2), 'utf-8')
 }
 
 /**
  * Save fix queue for later use by ally fix
  */
 async function saveFixQueue(violationIds: string[]): Promise<void> {
-  const fixQueuePath = resolve('.ally', 'fix-queue.json');
+  const fixQueuePath = resolve('.ally', 'fix-queue.json')
 
   // Ensure .ally directory exists
-  const dirPath = dirname(fixQueuePath);
+  const dirPath = dirname(fixQueuePath)
   if (!existsSync(dirPath)) {
-    await mkdir(dirPath, { recursive: true });
+    await mkdir(dirPath, { recursive: true })
   }
 
   const queue = {
     createdAt: new Date().toISOString(),
     violations: violationIds,
-  };
+  }
 
-  await writeFile(fixQueuePath, JSON.stringify(queue, null, 2), 'utf-8');
+  await writeFile(fixQueuePath, JSON.stringify(queue, null, 2), 'utf-8')
 }
 
 export async function triageCommand(options: TriageOptions = {}): Promise<void> {
-  printBanner();
+  printBanner()
 
-  const { input = '.ally/scan.json' } = options;
+  const { input = '.ally/scan.json' } = options
 
   // Load scan results
-  const spinner = createSpinner('Loading scan results...');
-  spinner.start();
+  const spinner = createSpinner('Loading scan results...')
+  spinner.start()
 
-  const reportPath = resolve(input);
+  const reportPath = resolve(input)
 
   if (!existsSync(reportPath)) {
-    spinner.stop();
-    suggestInit(reportPath);
-    return;
+    spinner.stop()
+    suggestInit(reportPath)
+    return
   }
 
-  let report: AllyReport;
+  let report: AllyReport
   try {
-    const content = await readFile(reportPath, 'utf-8');
-    report = JSON.parse(content) as AllyReport;
-    spinner.succeed(`Loaded scan results`);
+    const content = await readFile(reportPath, 'utf-8')
+    report = JSON.parse(content) as AllyReport
+    spinner.succeed(`Loaded scan results`)
   } catch (error) {
-    spinner.fail('Failed to load scan results');
-    printError(error instanceof Error ? error.message : String(error));
-    return;
+    spinner.fail('Failed to load scan results')
+    printError(error instanceof Error ? error.message : String(error))
+    return
   }
 
   // Group violations by type
-  const violationGroups = groupViolationsByType(report);
+  const violationGroups = groupViolationsByType(report)
 
   if (violationGroups.length === 0) {
-    printSuccess('No violations to triage! Your code is fully accessible.');
-    return;
+    printSuccess('No violations to triage! Your code is fully accessible.')
+    return
   }
 
-  console.log();
-  console.log(chalk.bold.cyan('Interactive Issue Triage'));
-  console.log(chalk.dim('Categorize each violation type to prioritize your accessibility work'));
-  console.log(chalk.dim('━'.repeat(60)));
-  console.log();
+  console.log()
+  console.log(chalk.bold.cyan('Interactive Issue Triage'))
+  console.log(chalk.dim('Categorize each violation type to prioritize your accessibility work'))
+  console.log(chalk.dim('━'.repeat(60)))
+  console.log()
 
   // Show summary of what we're triaging
-  const totalOccurrences = violationGroups.reduce((sum, g) => sum + g.count, 0);
-  printInfo(`Found ${violationGroups.length} unique violation types (${totalOccurrences} total occurrences)`);
-  console.log();
+  const totalOccurrences = violationGroups.reduce((sum, g) => sum + g.count, 0)
+  printInfo(
+    `Found ${violationGroups.length} unique violation types (${totalOccurrences} total occurrences)`
+  )
+  console.log()
 
   // Triage results
   const result: TriageResult = {
     fix: [],
     ignore: [],
     backlog: [],
-  };
+  }
 
-  const backlogItems: BacklogItem[] = [];
+  const backlogItems: BacklogItem[] = []
 
   // Process each violation group
   for (let i = 0; i < violationGroups.length; i++) {
-    const group = violationGroups[i];
-    const progress = chalk.dim(`[${i + 1}/${violationGroups.length}]`);
+    const group = violationGroups[i]
+    const progress = chalk.dim(`[${i + 1}/${violationGroups.length}]`)
 
-    console.log();
-    console.log(`${progress} ${formatViolationChoice(group)}`);
-    console.log(chalk.dim(`   ${group.description}`));
-    console.log(chalk.dim(`   Learn more: ${group.helpUrl}`));
-    console.log();
+    console.log()
+    console.log(`${progress} ${formatViolationChoice(group)}`)
+    console.log(chalk.dim(`   ${group.description}`))
+    console.log(chalk.dim(`   Learn more: ${group.helpUrl}`))
+    console.log()
 
     // Interactive prompt for each violation
     const { action } = await inquirer.prompt([
@@ -320,73 +322,73 @@ export async function triageCommand(options: TriageOptions = {}): Promise<void> 
         ],
         default: 'fix',
       },
-    ]);
+    ])
 
     switch (action) {
       case 'fix':
-        result.fix.push(group.id);
-        console.log(chalk.green(`   + Added to fix queue`));
-        break;
+        result.fix.push(group.id)
+        console.log(chalk.green(`   + Added to fix queue`))
+        break
       case 'backlog':
-        result.backlog.push(group.id);
+        result.backlog.push(group.id)
         backlogItems.push({
           id: group.id,
           description: group.help,
           impact: group.impact,
           count: group.count,
           addedAt: new Date().toISOString(),
-        });
-        console.log(chalk.yellow(`   -> Added to backlog`));
-        break;
+        })
+        console.log(chalk.yellow(`   -> Added to backlog`))
+        break
       case 'ignore':
-        result.ignore.push(group.id);
-        console.log(chalk.red(`   x Will be ignored`));
-        break;
+        result.ignore.push(group.id)
+        console.log(chalk.red(`   x Will be ignored`))
+        break
       case 'skip':
-        console.log(chalk.dim(`   - Skipped for now`));
-        break;
+        console.log(chalk.dim(`   - Skipped for now`))
+        break
     }
   }
 
   // Save results
-  console.log();
-  console.log(chalk.dim('━'.repeat(60)));
-  console.log();
+  console.log()
+  console.log(chalk.dim('━'.repeat(60)))
+  console.log()
 
-  const saveSpinner = createSpinner('Saving triage results...');
-  saveSpinner.start();
+  const saveSpinner = createSpinner('Saving triage results...')
+  saveSpinner.start()
 
   try {
     // Save .allyignore
     if (result.ignore.length > 0) {
-      await saveIgnorePatterns(result.ignore);
+      await saveIgnorePatterns(result.ignore)
     }
 
     // Save backlog
     if (backlogItems.length > 0) {
-      await saveBacklog(backlogItems);
+      await saveBacklog(backlogItems)
     }
 
     // Save fix queue
     if (result.fix.length > 0) {
-      await saveFixQueue(result.fix);
+      await saveFixQueue(result.fix)
     }
 
-    saveSpinner.succeed('Triage results saved');
+    saveSpinner.succeed('Triage results saved')
   } catch (error) {
-    saveSpinner.fail('Failed to save triage results');
-    printError(error instanceof Error ? error.message : String(error));
+    saveSpinner.fail('Failed to save triage results')
+    printError(error instanceof Error ? error.message : String(error))
   }
 
   // Print summary
-  console.log();
+  console.log()
   const summaryContent = `
 ${chalk.bold('Triage Complete!')}
 
 ${chalk.green('Fix now:')} ${result.fix.length} violation type${result.fix.length === 1 ? '' : 's'}
 ${chalk.yellow('Backlog:')} ${result.backlog.length} violation type${result.backlog.length === 1 ? '' : 's'}
 ${chalk.red('Ignored:')} ${result.ignore.length} violation type${result.ignore.length === 1 ? '' : 's'}
-`.trim();
+`.trim()
 
   console.log(
     boxen(summaryContent, {
@@ -394,19 +396,25 @@ ${chalk.red('Ignored:')} ${result.ignore.length} violation type${result.ignore.l
       borderStyle: 'round',
       borderColor: 'cyan',
     })
-  );
+  )
 
   // Show next steps
-  console.log();
+  console.log()
   if (result.fix.length > 0) {
-    printSuccess(`Run ${chalk.cyan('ally fix')} to fix the ${result.fix.length} queued issue${result.fix.length === 1 ? '' : 's'}`);
+    printSuccess(
+      `Run ${chalk.cyan('ally fix')} to fix the ${result.fix.length} queued issue${result.fix.length === 1 ? '' : 's'}`
+    )
   }
   if (result.ignore.length > 0) {
-    printInfo(`${result.ignore.length} pattern${result.ignore.length === 1 ? '' : 's'} added to ${chalk.cyan('.allyignore')}`);
+    printInfo(
+      `${result.ignore.length} pattern${result.ignore.length === 1 ? '' : 's'} added to ${chalk.cyan('.allyignore')}`
+    )
   }
   if (result.backlog.length > 0) {
-    printInfo(`${result.backlog.length} item${result.backlog.length === 1 ? '' : 's'} saved to ${chalk.cyan('.ally/backlog.json')}`);
+    printInfo(
+      `${result.backlog.length} item${result.backlog.length === 1 ? '' : 's'} saved to ${chalk.cyan('.ally/backlog.json')}`
+    )
   }
 }
 
-export default triageCommand;
+export default triageCommand

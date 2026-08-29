@@ -3,24 +3,29 @@
  * Used for generating VPAT/ACR compliance reports
  */
 
-export type ConformanceLevel = 'A' | 'AA' | 'AAA';
-export type ConformanceStatus = 'Supports' | 'Partially Supports' | 'Does Not Support' | 'Not Applicable' | 'Not Evaluated';
-export type Testability = 'full' | 'partial' | 'manual';
+export type ConformanceLevel = 'A' | 'AA' | 'AAA'
+export type ConformanceStatus =
+  | 'Supports'
+  | 'Partially Supports'
+  | 'Does Not Support'
+  | 'Not Applicable'
+  | 'Not Evaluated'
+export type Testability = 'full' | 'partial' | 'manual'
 
 export interface WcagCriterion {
-  id: string;           // e.g., "1.1.1"
-  name: string;         // e.g., "Non-text Content"
-  level: ConformanceLevel;
-  axeRules: string[];   // axe-core rule IDs that test this criterion
-  testability: Testability;
-  manualNote?: string;  // Guidance for manual review when testability is partial/manual
+  id: string // e.g., "1.1.1"
+  name: string // e.g., "Non-text Content"
+  level: ConformanceLevel
+  axeRules: string[] // axe-core rule IDs that test this criterion
+  testability: Testability
+  manualNote?: string // Guidance for manual review when testability is partial/manual
 }
 
 export interface ConformanceResult {
-  criterion: WcagCriterion;
-  status: ConformanceStatus;
-  remarks: string;
-  violationCount: number;
+  criterion: WcagCriterion
+  status: ConformanceStatus
+  remarks: string
+  violationCount: number
 }
 
 /**
@@ -33,7 +38,14 @@ export const WCAG_CRITERIA: WcagCriterion[] = [
     id: '1.1.1',
     name: 'Non-text Content',
     level: 'A',
-    axeRules: ['image-alt', 'input-image-alt', 'svg-img-alt', 'area-alt', 'object-alt', 'role-img-alt'],
+    axeRules: [
+      'image-alt',
+      'input-image-alt',
+      'svg-img-alt',
+      'area-alt',
+      'object-alt',
+      'role-img-alt',
+    ],
     testability: 'full',
   },
   {
@@ -80,7 +92,20 @@ export const WCAG_CRITERIA: WcagCriterion[] = [
     id: '1.3.1',
     name: 'Info and Relationships',
     level: 'A',
-    axeRules: ['label', 'list', 'listitem', 'definition-list', 'dlitem', 'landmark-one-main', 'landmark-no-duplicate-main', 'region', 'th-has-data-cells', 'td-headers-attr', 'table-fake-caption', 'scope-attr-valid'],
+    axeRules: [
+      'label',
+      'list',
+      'listitem',
+      'definition-list',
+      'dlitem',
+      'landmark-one-main',
+      'landmark-no-duplicate-main',
+      'region',
+      'th-has-data-cells',
+      'td-headers-attr',
+      'table-fake-caption',
+      'scope-attr-valid',
+    ],
     testability: 'full',
   },
   {
@@ -453,7 +478,18 @@ export const WCAG_CRITERIA: WcagCriterion[] = [
     id: '4.1.2',
     name: 'Name, Role, Value',
     level: 'A',
-    axeRules: ['button-name', 'aria-allowed-attr', 'aria-hidden-body', 'aria-hidden-focus', 'aria-required-attr', 'aria-required-children', 'aria-required-parent', 'aria-roles', 'aria-valid-attr', 'aria-valid-attr-value'],
+    axeRules: [
+      'button-name',
+      'aria-allowed-attr',
+      'aria-hidden-body',
+      'aria-hidden-focus',
+      'aria-required-attr',
+      'aria-required-children',
+      'aria-required-parent',
+      'aria-roles',
+      'aria-valid-attr',
+      'aria-valid-attr-value',
+    ],
     testability: 'full',
   },
   {
@@ -464,14 +500,15 @@ export const WCAG_CRITERIA: WcagCriterion[] = [
     testability: 'partial',
     manualNote: 'Verify status messages are announced by screen readers',
   },
-];
+]
 
 /**
  * Get criteria filtered by conformance level
  */
 export function getCriteriaByLevel(maxLevel: ConformanceLevel): WcagCriterion[] {
-  const levels: ConformanceLevel[] = maxLevel === 'AAA' ? ['A', 'AA', 'AAA'] : maxLevel === 'AA' ? ['A', 'AA'] : ['A'];
-  return WCAG_CRITERIA.filter(c => levels.includes(c.level));
+  const levels: ConformanceLevel[] =
+    maxLevel === 'AAA' ? ['A', 'AA', 'AAA'] : maxLevel === 'AA' ? ['A', 'AA'] : ['A']
+  return WCAG_CRITERIA.filter((c) => levels.includes(c.level))
 }
 
 /**
@@ -479,11 +516,11 @@ export function getCriteriaByLevel(maxLevel: ConformanceLevel): WcagCriterion[] 
  */
 export function getConformanceStatus(
   criterion: WcagCriterion,
-  violationIds: Set<string>,
+  violationIds: Set<string>
 ): ConformanceResult {
   // Check if any axe rules for this criterion have violations
-  const hasViolations = criterion.axeRules.some(rule => violationIds.has(rule));
-  const violationCount = criterion.axeRules.filter(rule => violationIds.has(rule)).length;
+  const hasViolations = criterion.axeRules.some((rule) => violationIds.has(rule))
+  const violationCount = criterion.axeRules.filter((rule) => violationIds.has(rule)).length
 
   if (criterion.testability === 'manual') {
     return {
@@ -491,7 +528,7 @@ export function getConformanceStatus(
       status: 'Not Evaluated',
       remarks: criterion.manualNote || 'Requires manual testing',
       violationCount: 0,
-    };
+    }
   }
 
   if (criterion.testability === 'partial') {
@@ -501,14 +538,14 @@ export function getConformanceStatus(
         status: 'Does Not Support',
         remarks: `Automated testing found violations. ${criterion.manualNote || 'Additional manual review recommended.'}`,
         violationCount,
-      };
+      }
     }
     return {
       criterion,
       status: 'Partially Supports',
       remarks: `No automated violations found. ${criterion.manualNote || 'Manual verification required for full conformance.'}`,
       violationCount: 0,
-    };
+    }
   }
 
   // Full testability
@@ -518,7 +555,7 @@ export function getConformanceStatus(
       status: 'Does Not Support',
       remarks: 'Automated testing detected accessibility violations',
       violationCount,
-    };
+    }
   }
 
   return {
@@ -526,7 +563,7 @@ export function getConformanceStatus(
     status: 'Supports',
     remarks: 'No issues detected by automated testing',
     violationCount: 0,
-  };
+  }
 }
 
 /**
@@ -534,9 +571,9 @@ export function getConformanceStatus(
  */
 export function generateConformanceReport(
   violationIds: string[],
-  level: ConformanceLevel = 'AA',
+  level: ConformanceLevel = 'AA'
 ): ConformanceResult[] {
-  const violationSet = new Set(violationIds);
-  const criteria = getCriteriaByLevel(level);
-  return criteria.map(criterion => getConformanceStatus(criterion, violationSet));
+  const violationSet = new Set(violationIds)
+  const criteria = getCriteriaByLevel(level)
+  return criteria.map((criterion) => getConformanceStatus(criterion, violationSet))
 }

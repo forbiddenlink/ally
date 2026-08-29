@@ -9,29 +9,30 @@
  * Searches current directory and parent directories (like eslint)
  */
 
-import { existsSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { resolve, dirname, join } from 'path';
+import { existsSync } from 'fs'
+import { readFile } from 'fs/promises'
+import { dirname, join, resolve } from 'path'
 
 /** Ignore file names to search for (in order of priority) */
-const IGNORE_FILES = ['.allyignore', '.ally-ignore'];
-import type { Severity } from '../types/index.js';
-import type { WcagStandard } from './scanner.js';
+const IGNORE_FILES = ['.allyignore', '.ally-ignore']
+
+import type { Severity } from '../types/index.js'
+import type { WcagStandard } from './scanner.js'
 
 /**
  * Configuration options for the scan command
  */
 export interface ScanConfig {
   /** Paths to scan (relative to config file or cwd) */
-  paths?: string[];
+  paths?: string[]
   /** Glob patterns to ignore */
-  ignore?: string[];
+  ignore?: string[]
   /** Violation threshold for CI (exit with error if exceeded) */
-  threshold?: number;
+  threshold?: number
   /** WCAG standard to test against */
-  standard?: WcagStandard;
+  standard?: WcagStandard
   /** Only fail on these severity levels */
-  failOn?: Severity[];
+  failOn?: Severity[]
 }
 
 /**
@@ -39,9 +40,9 @@ export interface ScanConfig {
  */
 export interface ReportConfig {
   /** Output format: json, sarif, markdown, html */
-  format?: string;
+  format?: string
   /** Output directory or file path */
-  output?: string;
+  output?: string
 }
 
 /**
@@ -49,92 +50,87 @@ export interface ReportConfig {
  */
 export interface FixConfig {
   /** Show what would be fixed without making changes */
-  dryRun?: boolean;
+  dryRun?: boolean
   /** Auto-approve fixes for these violation types */
-  autoApprove?: string[];
+  autoApprove?: string[]
 }
 
 /**
  * Complete Ally configuration
  */
 export interface AllyConfig {
-  scan?: ScanConfig;
-  report?: ReportConfig;
-  fix?: FixConfig;
+  scan?: ScanConfig
+  report?: ReportConfig
+  fix?: FixConfig
 }
 
 /** Config file names to search for (in order of priority) */
-const CONFIG_FILES = [
-  '.allyrc.json',
-  '.allyrc',
-  'ally.config.js',
-  'ally.config.cjs',
-];
+const CONFIG_FILES = ['.allyrc.json', '.allyrc', 'ally.config.js', 'ally.config.cjs']
 
 /** Result from loading config */
 export interface ConfigResult {
-  config: AllyConfig;
-  configPath: string | null;
+  config: AllyConfig
+  configPath: string | null
 }
 
 /**
  * Search for config file starting from directory and moving up to root
  */
 async function findConfigFile(startDir: string): Promise<string | null> {
-  let currentDir = resolve(startDir);
-  const root = dirname(currentDir);
+  let currentDir = resolve(startDir)
+  const root = dirname(currentDir)
 
   // Keep searching until we hit the root
   while (currentDir !== root) {
     for (const configFile of CONFIG_FILES) {
-      const configPath = join(currentDir, configFile);
+      const configPath = join(currentDir, configFile)
       if (existsSync(configPath)) {
-        return configPath;
+        return configPath
       }
     }
-    currentDir = dirname(currentDir);
+    currentDir = dirname(currentDir)
   }
 
   // Check root as well
   for (const configFile of CONFIG_FILES) {
-    const configPath = join(currentDir, configFile);
+    const configPath = join(currentDir, configFile)
     if (existsSync(configPath)) {
-      return configPath;
+      return configPath
     }
   }
 
-  return null;
+  return null
 }
 
 /**
  * Load and parse a config file
  */
 async function parseConfigFile(configPath: string): Promise<AllyConfig> {
-  const ext = configPath.split('.').pop();
+  const ext = configPath.split('.').pop()
 
   if (ext === 'js' || ext === 'cjs') {
     // Load JavaScript config (CommonJS)
     try {
-      const configModule = await import(configPath);
-      return configModule.default || configModule;
+      const configModule = await import(configPath)
+      return configModule.default || configModule
     } catch (error) {
       throw new Error(
         `Failed to load config from ${configPath}: ${error instanceof Error ? error.message : String(error)}`
-      );
+      )
     }
   }
 
   // Load JSON config
   try {
-    const content = await readFile(configPath, 'utf-8');
-    return JSON.parse(content) as AllyConfig;
+    const content = await readFile(configPath, 'utf-8')
+    return JSON.parse(content) as AllyConfig
   } catch (error) {
     if (error instanceof SyntaxError) {
-      throw new Error(`Invalid JSON in config file ${configPath}: ${error.message}`);
+      throw new Error(`Invalid JSON in config file ${configPath}: ${error.message}`)
     }
     throw new Error(
       `Failed to read config file ${configPath}: ${error instanceof Error ? error.message : String(error)}`
-    );
+    )
   }
 }
 
@@ -143,18 +139,24 @@ async function parseConfigFile(configPath: string): Promise<AllyConfig> {
  */
 function validateConfig(config: AllyConfig, configPath: string): void {
   const validStandards = [
-    'wcag2a', 'wcag2aa', 'wcag2aaa',
-    'wcag21a', 'wcag21aa', 'wcag21aaa',
-    'wcag22aa', 'section508', 'best-practice'
-  ];
+    'wcag2a',
+    'wcag2aa',
+    'wcag2aaa',
+    'wcag21a',
+    'wcag21aa',
+    'wcag21aaa',
+    'wcag22aa',
+    'section508',
+    'best-practice',
+  ]
 
-  const validSeverities: Severity[] = ['critical', 'serious', 'moderate', 'minor'];
+  const validSeverities: Severity[] = ['critical', 'serious', 'moderate', 'minor']
 
   if (config.scan?.standard && !validStandards.includes(config.scan.standard)) {
     throw new Error(
       `Invalid standard "${config.scan.standard}" in ${configPath}. ` +
-      `Valid options: ${validStandards.join(', ')}`
-    );
+        `Valid options: ${validStandards.join(', ')}`
+    )
   }
 
   if (config.scan?.failOn) {
@@ -162,8 +164,8 @@ function validateConfig(config: AllyConfig, configPath: string): void {
       if (!validSeverities.includes(severity)) {
         throw new Error(
           `Invalid severity "${severity}" in failOn in ${configPath}. ` +
-          `Valid options: ${validSeverities.join(', ')}`
-        );
+            `Valid options: ${validSeverities.join(', ')}`
+        )
       }
     }
   }
@@ -172,17 +174,17 @@ function validateConfig(config: AllyConfig, configPath: string): void {
     if (typeof config.scan.threshold !== 'number' || config.scan.threshold < 0) {
       throw new Error(
         `Invalid threshold "${config.scan.threshold}" in ${configPath}. ` +
-        `Must be a non-negative number.`
-      );
+          `Must be a non-negative number.`
+      )
     }
   }
 
-  const validFormats = ['json', 'sarif', 'markdown', 'html'];
+  const validFormats = ['json', 'sarif', 'markdown', 'html']
   if (config.report?.format && !validFormats.includes(config.report.format)) {
     throw new Error(
       `Invalid report format "${config.report.format}" in ${configPath}. ` +
-      `Valid options: ${validFormats.join(', ')}`
-    );
+        `Valid options: ${validFormats.join(', ')}`
+    )
   }
 }
 
@@ -197,25 +199,25 @@ function validateConfig(config: AllyConfig, configPath: string): void {
  */
 export async function loadConfig(startDir: string = process.cwd()): Promise<ConfigResult> {
   try {
-    const configPath = await findConfigFile(startDir);
+    const configPath = await findConfigFile(startDir)
 
     if (!configPath) {
-      return { config: {}, configPath: null };
+      return { config: {}, configPath: null }
     }
 
-    const config = await parseConfigFile(configPath);
-    validateConfig(config, configPath);
+    const config = await parseConfigFile(configPath)
+    validateConfig(config, configPath)
 
-    return { config, configPath };
+    return { config, configPath }
   } catch (error) {
     // Re-throw validation/parsing errors
     if (error instanceof Error && error.message.includes('config')) {
-      throw error;
+      throw error
     }
     // Wrap other errors
     throw new Error(
       `Failed to load config: ${error instanceof Error ? error.message : String(error)}`
-    );
+    )
   }
 }
 
@@ -228,7 +230,7 @@ export async function loadConfig(startDir: string = process.cwd()): Promise<Conf
  * @returns Path to config file or null if none found
  */
 export async function getConfigPath(startDir: string = process.cwd()): Promise<string | null> {
-  return findConfigFile(startDir);
+  return findConfigFile(startDir)
 }
 
 /**
@@ -244,44 +246,44 @@ export function mergeOptions<T extends Record<string, unknown>>(
   cliOptions: T,
   configOptions: Partial<T>
 ): T {
-  const merged = { ...configOptions } as T;
+  const merged = { ...configOptions } as T
 
   // CLI options override config options (only if explicitly set)
   for (const [key, value] of Object.entries(cliOptions)) {
     if (value !== undefined) {
-      (merged as Record<string, unknown>)[key] = value;
+      ;(merged as Record<string, unknown>)[key] = value
     }
   }
 
-  return merged;
+  return merged
 }
 
 /**
  * Search for .allyignore file starting from directory and moving up to root
  */
 async function findIgnoreFile(startDir: string): Promise<string | null> {
-  let currentDir = resolve(startDir);
-  const root = dirname(currentDir);
+  let currentDir = resolve(startDir)
+  const root = dirname(currentDir)
 
   while (currentDir !== root) {
     for (const ignoreFile of IGNORE_FILES) {
-      const ignorePath = join(currentDir, ignoreFile);
+      const ignorePath = join(currentDir, ignoreFile)
       if (existsSync(ignorePath)) {
-        return ignorePath;
+        return ignorePath
       }
     }
-    currentDir = dirname(currentDir);
+    currentDir = dirname(currentDir)
   }
 
   // Check root as well
   for (const ignoreFile of IGNORE_FILES) {
-    const ignorePath = join(currentDir, ignoreFile);
+    const ignorePath = join(currentDir, ignoreFile)
     if (existsSync(ignorePath)) {
-      return ignorePath;
+      return ignorePath
     }
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -298,20 +300,20 @@ function parseIgnoreFile(content: string): string[] {
     .map((pattern) => {
       // Convert directory patterns to glob patterns
       if (pattern.endsWith('/')) {
-        return `**/${pattern}**`;
+        return `**/${pattern}**`
       }
       // Ensure patterns without slashes match anywhere
       if (!pattern.includes('/') && !pattern.startsWith('**/')) {
-        return `**/${pattern}`;
+        return `**/${pattern}`
       }
-      return pattern;
-    });
+      return pattern
+    })
 }
 
 /** Result from loading ignore patterns */
 export interface IgnoreResult {
-  patterns: string[];
-  ignorePath: string | null;
+  patterns: string[]
+  ignorePath: string | null
 }
 
 /**
@@ -324,18 +326,18 @@ export interface IgnoreResult {
  * @returns Loaded ignore patterns and path to ignore file (if found)
  */
 export async function loadIgnorePatterns(startDir: string = process.cwd()): Promise<IgnoreResult> {
-  const ignorePath = await findIgnoreFile(startDir);
+  const ignorePath = await findIgnoreFile(startDir)
 
   if (!ignorePath) {
-    return { patterns: [], ignorePath: null };
+    return { patterns: [], ignorePath: null }
   }
 
   try {
-    const content = await readFile(ignorePath, 'utf-8');
-    const patterns = parseIgnoreFile(content);
-    return { patterns, ignorePath };
+    const content = await readFile(ignorePath, 'utf-8')
+    const patterns = parseIgnoreFile(content)
+    return { patterns, ignorePath }
   } catch {
     // If we can't read the file, return empty patterns
-    return { patterns: [], ignorePath: null };
+    return { patterns: [], ignorePath: null }
   }
 }

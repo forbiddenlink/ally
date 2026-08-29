@@ -3,47 +3,57 @@
  * Generates accessibility conformance reports in the official VPAT format
  */
 
-import type { ConformanceResult, ConformanceStatus } from './vpat-mappings.js';
+import type { ConformanceResult, ConformanceStatus } from './vpat-mappings.js'
 
 export interface VpatMetadata {
-  productName: string;
-  productVersion: string;
-  vendor: string;
-  contact?: string;
-  evaluationDate: string;
-  evaluationMethods: string[];
-  notes?: string;
+  productName: string
+  productVersion: string
+  vendor: string
+  contact?: string
+  evaluationDate: string
+  evaluationMethods: string[]
+  notes?: string
 }
 
 interface VpatData {
-  metadata: VpatMetadata;
-  conformanceResults: ConformanceResult[];
+  metadata: VpatMetadata
+  conformanceResults: ConformanceResult[]
   summary: {
-    supports: number;
-    partiallySupports: number;
-    doesNotSupport: number;
-    notApplicable: number;
-    notEvaluated: number;
-  };
+    supports: number
+    partiallySupports: number
+    doesNotSupport: number
+    notApplicable: number
+    notEvaluated: number
+  }
 }
 
 function getStatusClass(status: ConformanceStatus): string {
   switch (status) {
-    case 'Supports': return 'supports';
-    case 'Partially Supports': return 'partial';
-    case 'Does Not Support': return 'fails';
-    case 'Not Applicable': return 'na';
-    case 'Not Evaluated': return 'not-evaluated';
+    case 'Supports':
+      return 'supports'
+    case 'Partially Supports':
+      return 'partial'
+    case 'Does Not Support':
+      return 'fails'
+    case 'Not Applicable':
+      return 'na'
+    case 'Not Evaluated':
+      return 'not-evaluated'
   }
 }
 
 function getStatusIcon(status: ConformanceStatus): string {
   switch (status) {
-    case 'Supports': return '&#10004;';
-    case 'Partially Supports': return '&#9679;';
-    case 'Does Not Support': return '&#10008;';
-    case 'Not Applicable': return '&mdash;';
-    case 'Not Evaluated': return '?';
+    case 'Supports':
+      return '&#10004;'
+    case 'Partially Supports':
+      return '&#9679;'
+    case 'Does Not Support':
+      return '&#10008;'
+    case 'Not Applicable':
+      return '&mdash;'
+    case 'Not Evaluated':
+      return '?'
   }
 }
 
@@ -52,23 +62,27 @@ function escapeHtml(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
 }
 
 function generateWcagTable(results: ConformanceResult[], level: 'A' | 'AA'): string {
-  const filtered = results.filter(r => r.criterion.level === level);
+  const filtered = results.filter((r) => r.criterion.level === level)
 
-  return filtered.map(r => `
+  return filtered
+    .map(
+      (r) => `
     <tr class="${getStatusClass(r.status)}">
       <td><strong>${r.criterion.id}</strong> ${escapeHtml(r.criterion.name)}</td>
       <td class="status">${getStatusIcon(r.status)} ${r.status}</td>
       <td>${escapeHtml(r.remarks)}</td>
     </tr>
-  `).join('\n');
+  `
+    )
+    .join('\n')
 }
 
 export function generateVpatHtml(data: VpatData): string {
-  const { metadata, conformanceResults, summary } = data;
+  const { metadata, conformanceResults, summary } = data
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -264,10 +278,14 @@ export function generateVpatHtml(data: VpatData): string {
         <td>Vendor</td>
         <td>${escapeHtml(metadata.vendor)}</td>
       </tr>
-      ${metadata.contact ? `<tr>
+      ${
+        metadata.contact
+          ? `<tr>
         <td>Contact</td>
         <td>${escapeHtml(metadata.contact)}</td>
-      </tr>` : ''}
+      </tr>`
+          : ''
+      }
       <tr>
         <td>Evaluation Date</td>
         <td>${escapeHtml(metadata.evaluationDate)}</td>
@@ -390,7 +408,7 @@ export function generateVpatHtml(data: VpatData): string {
     </p>
   </footer>
 </body>
-</html>`;
+</html>`
 }
 
 /**
@@ -398,10 +416,10 @@ export function generateVpatHtml(data: VpatData): string {
  */
 export function calculateSummary(results: ConformanceResult[]): VpatData['summary'] {
   return {
-    supports: results.filter(r => r.status === 'Supports').length,
-    partiallySupports: results.filter(r => r.status === 'Partially Supports').length,
-    doesNotSupport: results.filter(r => r.status === 'Does Not Support').length,
-    notApplicable: results.filter(r => r.status === 'Not Applicable').length,
-    notEvaluated: results.filter(r => r.status === 'Not Evaluated').length,
-  };
+    supports: results.filter((r) => r.status === 'Supports').length,
+    partiallySupports: results.filter((r) => r.status === 'Partially Supports').length,
+    doesNotSupport: results.filter((r) => r.status === 'Does Not Support').length,
+    notApplicable: results.filter((r) => r.status === 'Not Applicable').length,
+    notEvaluated: results.filter((r) => r.status === 'Not Evaluated').length,
+  }
 }

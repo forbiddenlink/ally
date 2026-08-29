@@ -2,30 +2,25 @@
  * ally learn command - Educational command that explains WCAG criteria in depth
  */
 
-import chalk from 'chalk';
-import boxen from 'boxen';
-import {
-  printBanner,
-  printInfo,
-  printError,
-  printSuccess,
-} from '../utils/ui.js';
+import boxen from 'boxen'
+import chalk from 'chalk'
+import { printBanner, printError, printInfo, printSuccess } from '../utils/ui.js'
 
 interface ViolationInfo {
-  id: string;
-  name: string;
-  wcagCriterion: string;
-  wcagName: string;
-  level: 'A' | 'AA' | 'AAA';
-  explanation: string;
-  whyItMatters: string;
-  commonFixes: string[];
+  id: string
+  name: string
+  wcagCriterion: string
+  wcagName: string
+  level: 'A' | 'AA' | 'AAA'
+  explanation: string
+  whyItMatters: string
+  commonFixes: string[]
   codeExample?: {
-    bad: string;
-    good: string;
-  };
-  wcagUrl: string;
-  dequeUrl: string;
+    bad: string
+    good: string
+  }
+  wcagUrl: string
+  dequeUrl: string
 }
 
 // Built-in knowledge base for top 15 accessibility violations
@@ -45,7 +40,7 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
       'or context. This affects approximately 2.2 billion people with visual impairments worldwide. ' +
       'Alt text also helps when images fail to load due to slow connections or technical issues.',
     commonFixes: [
-      'Add descriptive alt text that conveys the image\'s meaning',
+      "Add descriptive alt text that conveys the image's meaning",
       'For decorative images, use alt="" (empty alt)',
       'For complex images like charts, provide detailed descriptions',
       'Avoid phrases like "image of" or "picture of" - screen readers already announce it\'s an image',
@@ -66,7 +61,7 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
     level: 'A',
     explanation:
       'Buttons must have an accessible name that describes their purpose. ' +
-      'This can come from visible text, aria-label, aria-labelledby, or the button\'s title attribute. ' +
+      "This can come from visible text, aria-label, aria-labelledby, or the button's title attribute. " +
       'Icon-only buttons are especially prone to this issue.',
     whyItMatters:
       'When a button lacks an accessible name, screen reader users hear only "button" with no indication ' +
@@ -113,7 +108,7 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
     dequeUrl: 'https://dequeuniversity.com/rules/axe/4.8/link-name',
   },
 
-  'label': {
+  label: {
     id: 'label',
     name: 'Form Input Labels',
     wcagCriterion: '1.3.1',
@@ -176,7 +171,7 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
     wcagName: 'Language of Page',
     level: 'A',
     explanation:
-      'The <html> element must have a lang attribute that identifies the page\'s primary language. ' +
+      "The <html> element must have a lang attribute that identifies the page's primary language. " +
       'This helps screen readers use the correct pronunciation rules and helps browsers offer translation. ' +
       'Use standard language codes like "en" for English, "es" for Spanish, "fr" for French.',
     whyItMatters:
@@ -205,9 +200,9 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
     explanation:
       'Every page needs a <title> element that describes its topic or purpose. ' +
       'The title appears in browser tabs, bookmarks, and search results. ' +
-      'It\'s the first thing screen readers announce when a page loads.',
+      "It's the first thing screen readers announce when a page loads.",
     whyItMatters:
-      'Screen reader users rely on page titles to know what page they\'ve landed on. ' +
+      "Screen reader users rely on page titles to know what page they've landed on. " +
       'When users have many tabs open, descriptive titles help everyone find the right one. ' +
       'Search engines also use titles to understand and rank your content.',
     commonFixes: [
@@ -224,7 +219,7 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
     dequeUrl: 'https://dequeuniversity.com/rules/axe/4.8/document-title',
   },
 
-  'list': {
+  list: {
     id: 'list',
     name: 'List Structure',
     wcagCriterion: '1.3.1',
@@ -251,7 +246,7 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
     dequeUrl: 'https://dequeuniversity.com/rules/axe/4.8/list',
   },
 
-  'listitem': {
+  listitem: {
     id: 'listitem',
     name: 'List Item Structure',
     wcagCriterion: '1.3.1',
@@ -291,9 +286,9 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
     whyItMatters:
       'Screen reader users encounter iframes as navigation landmarks. Without a title, users hear ' +
       'just "frame" with no indication of its content. They may waste time entering frames that ' +
-      'don\'t interest them or miss important embedded content.',
+      "don't interest them or miss important embedded content.",
     commonFixes: [
-      'Add a title attribute describing the iframe\'s content',
+      "Add a title attribute describing the iframe's content",
       'Use descriptive titles like "Product demo video" not "iframe"',
       'For decorative iframes, consider if they should be hidden from screen readers',
     ],
@@ -319,7 +314,7 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
       'Screen reader users need to know what action an image button performs. Without alt text, ' +
       'they only hear "image button" with no indication of its purpose, making forms unusable.',
     commonFixes: [
-      'Add alt attribute describing the button\'s action',
+      "Add alt attribute describing the button's action",
       'Use action words like "Search," "Submit," or "Add to cart"',
       'Consider using <button> with an <img> inside for more flexibility',
     ],
@@ -358,7 +353,7 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
     dequeUrl: 'https://dequeuniversity.com/rules/axe/4.8/meta-viewport',
   },
 
-  'region': {
+  region: {
     id: 'region',
     name: 'Page Regions',
     wcagCriterion: '1.3.1',
@@ -427,7 +422,7 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
       'and role="menuitem" must be inside role="menu" or role="menubar".',
     whyItMatters:
       'Child roles without proper parents are orphaned and lose their semantic meaning. ' +
-      'A listitem outside a list isn\'t announced as a list item. Screen reader users miss ' +
+      "A listitem outside a list isn't announced as a list item. Screen reader users miss " +
       'the relationship between elements.',
     commonFixes: [
       'Wrap elements in the required parent role container',
@@ -442,10 +437,10 @@ const VIOLATIONS_DB: Record<string, ViolationInfo> = {
     wcagUrl: 'https://www.w3.org/WAI/WCAG21/Understanding/info-and-relationships.html',
     dequeUrl: 'https://dequeuniversity.com/rules/axe/4.8/aria-required-parent',
   },
-};
+}
 
 interface LearnOptions {
-  list?: boolean;
+  list?: boolean
 }
 
 /**
@@ -453,158 +448,152 @@ interface LearnOptions {
  */
 async function isCopilotAvailable(): Promise<boolean> {
   try {
-    const { exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
-    await execAsync('which gh');
+    const { exec } = await import('child_process')
+    const { promisify } = await import('util')
+    const execAsync = promisify(exec)
+    await execAsync('which gh')
     // Check if copilot extension is available
-    const result = await execAsync('gh copilot --help 2>&1').catch(() => null);
-    return result !== null;
+    const result = await execAsync('gh copilot --help 2>&1').catch(() => null)
+    return result !== null
   } catch {
-    return false;
+    return false
   }
 }
 
-export async function learnCommand(violationId?: string, options: LearnOptions = {}): Promise<void> {
-  printBanner();
+export async function learnCommand(
+  violationId?: string,
+  options: LearnOptions = {}
+): Promise<void> {
+  printBanner()
 
   // Handle --list flag
   if (options.list) {
-    printViolationList();
-    return;
+    printViolationList()
+    return
   }
 
   // No violation ID provided
   if (!violationId) {
-    printInfo('Usage: ally learn <violation-id>');
-    console.log();
-    console.log(chalk.dim('Learn about a specific accessibility violation in depth.'));
-    console.log();
-    console.log(chalk.bold('Examples:'));
-    console.log(chalk.cyan('  ally learn image-alt'));
-    console.log(chalk.cyan('  ally learn color-contrast'));
-    console.log(chalk.cyan('  ally learn --list'));
-    console.log();
-    printInfo('Run ally learn --list to see all available violations.');
-    return;
+    printInfo('Usage: ally learn <violation-id>')
+    console.log()
+    console.log(chalk.dim('Learn about a specific accessibility violation in depth.'))
+    console.log()
+    console.log(chalk.bold('Examples:'))
+    console.log(chalk.cyan('  ally learn image-alt'))
+    console.log(chalk.cyan('  ally learn color-contrast'))
+    console.log(chalk.cyan('  ally learn --list'))
+    console.log()
+    printInfo('Run ally learn --list to see all available violations.')
+    return
   }
 
   // Normalize the violation ID (lowercase, handle common aliases)
-  const normalizedId = normalizeViolationId(violationId);
+  const normalizedId = normalizeViolationId(violationId)
 
   // Look up the violation
-  const violation = VIOLATIONS_DB[normalizedId];
+  const violation = VIOLATIONS_DB[normalizedId]
 
   if (!violation) {
-    printError(`Unknown violation: ${violationId}`);
-    console.log();
-    printInfo('Did you mean one of these?');
-    const suggestions = findSimilarViolations(violationId);
+    printError(`Unknown violation: ${violationId}`)
+    console.log()
+    printInfo('Did you mean one of these?')
+    const suggestions = findSimilarViolations(violationId)
     for (const suggestion of suggestions) {
-      console.log(chalk.cyan(`  ally learn ${suggestion}`));
+      console.log(chalk.cyan(`  ally learn ${suggestion}`))
     }
-    console.log();
-    printInfo('Run ally learn --list to see all available violations.');
-    return;
+    console.log()
+    printInfo('Run ally learn --list to see all available violations.')
+    return
   }
 
   // Display violation information
-  await displayViolationInfo(violation);
+  await displayViolationInfo(violation)
 }
 
 function normalizeViolationId(id: string): string {
   // Common aliases
   const aliases: Record<string, string> = {
-    'alt': 'image-alt',
+    alt: 'image-alt',
     'img-alt': 'image-alt',
     'alt-text': 'image-alt',
-    'contrast': 'color-contrast',
-    'lang': 'html-has-lang',
-    'language': 'html-has-lang',
-    'title': 'document-title',
+    contrast: 'color-contrast',
+    lang: 'html-has-lang',
+    language: 'html-has-lang',
+    title: 'document-title',
     'page-title': 'document-title',
     'input-label': 'label',
     'form-label': 'label',
-    'labels': 'label',
+    labels: 'label',
     'iframe-title': 'frame-title',
-    'viewport': 'meta-viewport',
-    'zoom': 'meta-viewport',
-    'landmarks': 'region',
-  };
+    viewport: 'meta-viewport',
+    zoom: 'meta-viewport',
+    landmarks: 'region',
+  }
 
-  const lower = id.toLowerCase();
-  return aliases[lower] || lower;
+  const lower = id.toLowerCase()
+  return aliases[lower] || lower
 }
 
 function findSimilarViolations(id: string): string[] {
-  const violations = Object.keys(VIOLATIONS_DB);
-  const lower = id.toLowerCase();
+  const violations = Object.keys(VIOLATIONS_DB)
+  const lower = id.toLowerCase()
 
   // Find violations that contain the search term
-  const matches = violations.filter(v =>
-    v.includes(lower) || lower.includes(v.split('-')[0])
-  );
+  const matches = violations.filter((v) => v.includes(lower) || lower.includes(v.split('-')[0]))
 
   if (matches.length > 0) {
-    return matches.slice(0, 3);
+    return matches.slice(0, 3)
   }
 
   // Return some popular ones as fallback
-  return ['image-alt', 'color-contrast', 'button-name'];
+  return ['image-alt', 'color-contrast', 'button-name']
 }
 
 function printViolationList(): void {
-  console.log(chalk.bold.cyan('Available Violation Types'));
-  console.log(chalk.dim('=' .repeat(60)));
-  console.log();
+  console.log(chalk.bold.cyan('Available Violation Types'))
+  console.log(chalk.dim('='.repeat(60)))
+  console.log()
 
   // Group by WCAG level
-  const byLevel: Record<string, ViolationInfo[]> = { A: [], AA: [], AAA: [] };
+  const byLevel: Record<string, ViolationInfo[]> = { A: [], AA: [], AAA: [] }
 
   for (const violation of Object.values(VIOLATIONS_DB)) {
-    byLevel[violation.level].push(violation);
+    byLevel[violation.level].push(violation)
   }
 
   for (const level of ['A', 'AA', 'AAA'] as const) {
-    const violations = byLevel[level];
-    if (violations.length === 0) continue;
+    const violations = byLevel[level]
+    if (violations.length === 0) continue
 
-    const levelColor = level === 'A' ? chalk.green :
-                       level === 'AA' ? chalk.yellow :
-                       chalk.red;
+    const levelColor = level === 'A' ? chalk.green : level === 'AA' ? chalk.yellow : chalk.red
 
-    console.log(levelColor.bold(`WCAG Level ${level}`));
-    console.log(chalk.dim('-'.repeat(60)));
+    console.log(levelColor.bold(`WCAG Level ${level}`))
+    console.log(chalk.dim('-'.repeat(60)))
 
     for (const v of violations) {
-      const idPadded = v.id.padEnd(25);
-      console.log(
-        chalk.cyan(idPadded) +
-        chalk.dim(`${v.wcagCriterion} `) +
-        v.name
-      );
+      const idPadded = v.id.padEnd(25)
+      console.log(chalk.cyan(idPadded) + chalk.dim(`${v.wcagCriterion} `) + v.name)
     }
-    console.log();
+    console.log()
   }
 
-  console.log(chalk.dim('─'.repeat(60)));
-  console.log();
-  printInfo('Learn about a violation:');
-  console.log(chalk.cyan('  ally learn <violation-id>'));
-  console.log();
-  console.log(chalk.dim('Example: ally learn image-alt'));
+  console.log(chalk.dim('─'.repeat(60)))
+  console.log()
+  printInfo('Learn about a violation:')
+  console.log(chalk.cyan('  ally learn <violation-id>'))
+  console.log()
+  console.log(chalk.dim('Example: ally learn image-alt'))
 }
 
 async function displayViolationInfo(violation: ViolationInfo): Promise<void> {
   // Header box with violation name and WCAG criterion
-  const levelColor = violation.level === 'A' ? chalk.green :
-                     violation.level === 'AA' ? chalk.yellow :
-                     chalk.red;
+  const levelColor =
+    violation.level === 'A' ? chalk.green : violation.level === 'AA' ? chalk.yellow : chalk.red
 
   const header = `${violation.name}
 
 ${chalk.bold('WCAG Criterion:')} ${violation.wcagCriterion} ${violation.wcagName}
-${chalk.bold('Level:')} ${levelColor.bold(violation.level)}`;
+${chalk.bold('Level:')} ${levelColor.bold(violation.level)}`
 
   console.log(
     boxen(header, {
@@ -615,91 +604,96 @@ ${chalk.bold('Level:')} ${levelColor.bold(violation.level)}`;
       title: violation.id,
       titleAlignment: 'center',
     })
-  );
+  )
 
   // What is this?
-  console.log(chalk.bold.white('What is this?'));
-  console.log(chalk.dim('─'.repeat(60)));
-  console.log(wrapText(violation.explanation, 60));
-  console.log();
+  console.log(chalk.bold.white('What is this?'))
+  console.log(chalk.dim('─'.repeat(60)))
+  console.log(wrapText(violation.explanation, 60))
+  console.log()
 
   // Why it matters
-  console.log(chalk.bold.white('Why it matters'));
-  console.log(chalk.dim('─'.repeat(60)));
-  console.log(wrapText(violation.whyItMatters, 60));
-  console.log();
+  console.log(chalk.bold.white('Why it matters'))
+  console.log(chalk.dim('─'.repeat(60)))
+  console.log(wrapText(violation.whyItMatters, 60))
+  console.log()
 
   // Common fixes
-  console.log(chalk.bold.white('How to fix'));
-  console.log(chalk.dim('─'.repeat(60)));
+  console.log(chalk.bold.white('How to fix'))
+  console.log(chalk.dim('─'.repeat(60)))
   for (const fix of violation.commonFixes) {
-    console.log(chalk.green('  • ') + fix);
+    console.log(chalk.green('  • ') + fix)
   }
-  console.log();
+  console.log()
 
   // Code example
   if (violation.codeExample) {
-    console.log(chalk.bold.white('Code example'));
-    console.log(chalk.dim('─'.repeat(60)));
-    console.log();
-    console.log(chalk.red.bold('  ✗ Bad:'));
+    console.log(chalk.bold.white('Code example'))
+    console.log(chalk.dim('─'.repeat(60)))
+    console.log()
+    console.log(chalk.red.bold('  ✗ Bad:'))
     for (const line of violation.codeExample.bad.split('\n')) {
-      console.log(chalk.red(`    ${line}`));
+      console.log(chalk.red(`    ${line}`))
     }
-    console.log();
-    console.log(chalk.green.bold('  ✓ Good:'));
+    console.log()
+    console.log(chalk.green.bold('  ✓ Good:'))
     for (const line of violation.codeExample.good.split('\n')) {
-      console.log(chalk.green(`    ${line}`));
+      console.log(chalk.green(`    ${line}`))
     }
-    console.log();
+    console.log()
   }
 
   // Resources
-  console.log(chalk.bold.white('Learn more'));
-  console.log(chalk.dim('─'.repeat(60)));
-  console.log(chalk.blue('  WCAG: ') + chalk.underline(violation.wcagUrl));
-  console.log(chalk.blue('  Deque: ') + chalk.underline(violation.dequeUrl));
-  console.log();
+  console.log(chalk.bold.white('Learn more'))
+  console.log(chalk.dim('─'.repeat(60)))
+  console.log(chalk.blue('  WCAG: ') + chalk.underline(violation.wcagUrl))
+  console.log(chalk.blue('  Deque: ') + chalk.underline(violation.dequeUrl))
+  console.log()
 
   // Copilot integration hint
-  const hasCopilot = await isCopilotAvailable();
+  const hasCopilot = await isCopilotAvailable()
   if (hasCopilot) {
     console.log(
       boxen(
-        chalk.cyan('Tip: ') + 'Get context-specific guidance with Copilot:\n\n' +
-        chalk.dim(`  gh copilot explain "How do I fix ${violation.id} violations in my React app?"`) + '\n' +
-        chalk.dim(`  gh copilot explain "Best practices for ${violation.name.toLowerCase()}"`)
-      , {
-        padding: { top: 0, bottom: 0, left: 1, right: 1 },
-        borderStyle: 'round',
-        borderColor: 'blue',
-        dimBorder: true,
-      })
-    );
+        chalk.cyan('Tip: ') +
+          'Get context-specific guidance with Copilot:\n\n' +
+          chalk.dim(
+            `  gh copilot explain "How do I fix ${violation.id} violations in my React app?"`
+          ) +
+          '\n' +
+          chalk.dim(`  gh copilot explain "Best practices for ${violation.name.toLowerCase()}"`),
+        {
+          padding: { top: 0, bottom: 0, left: 1, right: 1 },
+          borderStyle: 'round',
+          borderColor: 'blue',
+          dimBorder: true,
+        }
+      )
+    )
   } else {
     printInfo(
       'Install GitHub Copilot CLI for context-specific guidance: ' +
-      chalk.cyan('gh extension install github/gh-copilot')
-    );
+        chalk.cyan('gh extension install github/gh-copilot')
+    )
   }
 }
 
 function wrapText(text: string, width: number): string {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let currentLine = '';
+  const words = text.split(' ')
+  const lines: string[] = []
+  let currentLine = ''
 
   for (const word of words) {
     if ((currentLine + ' ' + word).trim().length <= width) {
-      currentLine = (currentLine + ' ' + word).trim();
+      currentLine = (currentLine + ' ' + word).trim()
     } else {
-      if (currentLine) lines.push(currentLine);
-      currentLine = word;
+      if (currentLine) lines.push(currentLine)
+      currentLine = word
     }
   }
-  if (currentLine) lines.push(currentLine);
+  if (currentLine) lines.push(currentLine)
 
-  return lines.join('\n');
+  return lines.join('\n')
 }
 
-export default learnCommand;
+export default learnCommand

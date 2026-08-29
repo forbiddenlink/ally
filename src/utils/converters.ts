@@ -3,62 +3,62 @@
  * Converts AllyReport to various output formats (SARIF, JUnit, CSV)
  */
 
-import { relative } from 'path';
-import type { AllyReport, Violation, Severity } from '../types/index.js';
+import { relative } from 'path'
+import type { AllyReport, Severity, Violation } from '../types/index.js'
 
 // SARIF 2.1.0 types
 export interface SarifReport {
-  $schema: string;
-  version: string;
-  runs: SarifRun[];
+  $schema: string
+  version: string
+  runs: SarifRun[]
 }
 
 interface SarifRun {
   tool: {
     driver: {
-      name: string;
-      version: string;
-      informationUri: string;
-      rules: SarifRule[];
-    };
-  };
-  results: SarifResult[];
+      name: string
+      version: string
+      informationUri: string
+      rules: SarifRule[]
+    }
+  }
+  results: SarifResult[]
 }
 
 interface SarifRule {
-  id: string;
-  name: string;
-  shortDescription: { text: string };
-  fullDescription: { text: string };
-  helpUri: string;
+  id: string
+  name: string
+  shortDescription: { text: string }
+  fullDescription: { text: string }
+  helpUri: string
   defaultConfiguration: {
-    level: 'error' | 'warning' | 'note';
-  };
+    level: 'error' | 'warning' | 'note'
+  }
   properties?: {
-    tags?: string[];
-  };
+    tags?: string[]
+  }
 }
 
 interface SarifResult {
-  ruleId: string;
-  ruleIndex: number;
-  level: 'error' | 'warning' | 'note';
-  message: { text: string };
-  locations: SarifLocation[];
+  ruleId: string
+  ruleIndex: number
+  level: 'error' | 'warning' | 'note'
+  message: { text: string }
+  locations: SarifLocation[]
 }
 
 interface SarifLocation {
   physicalLocation: {
     artifactLocation: {
-      uri: string;
-      uriBaseId?: string;
-    };
+      uri: string
+      uriBaseId?: string
+    }
     region?: {
-      startLine?: number;
-      startColumn?: number;
-      snippet?: { text: string };
-    };
-  };
+      startLine?: number
+      startColumn?: number
+      snippet?: { text: string }
+    }
+  }
 }
 
 /**
@@ -68,12 +68,12 @@ function severityToSarifLevel(severity: Severity): 'error' | 'warning' | 'note' 
   switch (severity) {
     case 'critical':
     case 'serious':
-      return 'error';
+      return 'error'
     case 'moderate':
-      return 'warning';
+      return 'warning'
     case 'minor':
     default:
-      return 'note';
+      return 'note'
   }
 }
 
@@ -82,22 +82,22 @@ function severityToSarifLevel(severity: Severity): 'error' | 'warning' | 'note' 
  */
 export function convertToSarif(report: AllyReport): SarifReport {
   // Collect unique rules from all violations
-  const ruleMap = new Map<string, { violation: Violation; severity: Severity }>();
+  const ruleMap = new Map<string, { violation: Violation; severity: Severity }>()
 
   for (const result of report.results) {
     for (const violation of result.violations) {
       if (!ruleMap.has(violation.id)) {
-        ruleMap.set(violation.id, { violation, severity: violation.impact });
+        ruleMap.set(violation.id, { violation, severity: violation.impact })
       }
     }
   }
 
   // Build rules array
-  const rules: SarifRule[] = [];
-  const ruleIndexMap = new Map<string, number>();
+  const rules: SarifRule[] = []
+  const ruleIndexMap = new Map<string, number>()
 
   Array.from(ruleMap.entries()).forEach(([ruleId, { violation, severity }]) => {
-    ruleIndexMap.set(ruleId, rules.length);
+    ruleIndexMap.set(ruleId, rules.length)
     rules.push({
       id: ruleId,
       name: ruleId,
@@ -110,19 +110,17 @@ export function convertToSarif(report: AllyReport): SarifReport {
       properties: {
         tags: violation.tags,
       },
-    });
-  });
+    })
+  })
 
   // Build results array
-  const results: SarifResult[] = [];
+  const results: SarifResult[] = []
 
   for (const scanResult of report.results) {
-    const fileUri = scanResult.file
-      ? relative(process.cwd(), scanResult.file)
-      : scanResult.url;
+    const fileUri = scanResult.file ? relative(process.cwd(), scanResult.file) : scanResult.url
 
     for (const violation of scanResult.violations) {
-      const ruleIndex = ruleIndexMap.get(violation.id) ?? 0;
+      const ruleIndex = ruleIndexMap.get(violation.id) ?? 0
 
       // Create a result for each affected node
       for (const node of violation.nodes) {
@@ -139,7 +137,7 @@ export function convertToSarif(report: AllyReport): SarifReport {
               },
             },
           },
-        ];
+        ]
 
         results.push({
           ruleId: violation.id,
@@ -149,7 +147,7 @@ export function convertToSarif(report: AllyReport): SarifReport {
             text: `${violation.help}. ${node.failureSummary}`,
           },
           locations,
-        });
+        })
       }
     }
   }
@@ -171,7 +169,7 @@ export function convertToSarif(report: AllyReport): SarifReport {
         results,
       },
     ],
-  };
+  }
 }
 
 /**
@@ -183,7 +181,7 @@ function escapeXml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replace(/'/g, '&apos;')
 }
 
 /**
@@ -192,39 +190,37 @@ function escapeXml(str: string): string {
  */
 export function convertToJunit(report: AllyReport): string {
   // Count total tests (violations) and failures
-  let totalTests = 0;
-  let totalFailures = 0;
+  let totalTests = 0
+  let totalFailures = 0
 
   // Collect all violations with their file context
-  const testcases: string[] = [];
+  const testcases: string[] = []
 
   for (const result of report.results) {
-    const fileUri = result.file
-      ? relative(process.cwd(), result.file)
-      : result.url || 'unknown';
+    const fileUri = result.file ? relative(process.cwd(), result.file) : result.url || 'unknown'
 
     for (const violation of result.violations) {
       for (const node of violation.nodes) {
-        totalTests++;
-        totalFailures++;
+        totalTests++
+        totalFailures++
 
-        const wcagTags = violation.tags.filter(t => t.startsWith('wcag')).join(', ');
-        const failureMessage = escapeXml(`${violation.help}. ${node.failureSummary || ''}`);
+        const wcagTags = violation.tags.filter((t) => t.startsWith('wcag')).join(', ')
+        const failureMessage = escapeXml(`${violation.help}. ${node.failureSummary || ''}`)
         const failureDetails = escapeXml(
           `File: ${fileUri}\n` +
-          `Selector: ${node.target.join(' > ')}\n` +
-          `HTML: ${node.html}\n` +
-          `WCAG: ${wcagTags}\n` +
-          `Help: ${violation.helpUrl}`
-        );
+            `Selector: ${node.target.join(' > ')}\n` +
+            `HTML: ${node.html}\n` +
+            `WCAG: ${wcagTags}\n` +
+            `Help: ${violation.helpUrl}`
+        )
 
         testcases.push(
           `    <testcase name="${escapeXml(violation.id)}" classname="${escapeXml(violation.impact)}" time="0">\n` +
-          `      <failure message="${failureMessage}" type="${escapeXml(violation.impact)}">\n` +
-          `${failureDetails}\n` +
-          `      </failure>\n` +
-          `    </testcase>`
-        );
+            `      <failure message="${failureMessage}" type="${escapeXml(violation.impact)}">\n` +
+            `${failureDetails}\n` +
+            `      </failure>\n` +
+            `    </testcase>`
+        )
       }
     }
   }
@@ -237,9 +233,9 @@ export function convertToJunit(report: AllyReport): string {
     ...testcases,
     '  </testsuite>',
     '</testsuites>',
-  ].join('\n');
+  ].join('\n')
 
-  return xml;
+  return xml
 }
 
 /**
@@ -248,9 +244,9 @@ export function convertToJunit(report: AllyReport): string {
 function escapeCsv(value: string): string {
   // If value contains comma, quote, or newline, wrap in quotes and escape internal quotes
   if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
-    return '"' + value.replace(/"/g, '""') + '"';
+    return '"' + value.replace(/"/g, '""') + '"'
   }
-  return value;
+  return value
 }
 
 /**
@@ -258,16 +254,14 @@ function escapeCsv(value: string): string {
  * Headers: file,violation_id,impact,description,selector,wcag,help_url
  */
 export function convertToCsv(report: AllyReport): string {
-  const headers = ['file', 'violation_id', 'impact', 'description', 'selector', 'wcag', 'help_url'];
-  const rows: string[] = [headers.join(',')];
+  const headers = ['file', 'violation_id', 'impact', 'description', 'selector', 'wcag', 'help_url']
+  const rows: string[] = [headers.join(',')]
 
   for (const result of report.results) {
-    const fileUri = result.file
-      ? relative(process.cwd(), result.file)
-      : result.url || 'unknown';
+    const fileUri = result.file ? relative(process.cwd(), result.file) : result.url || 'unknown'
 
     for (const violation of result.violations) {
-      const wcagTags = violation.tags.filter(t => t.startsWith('wcag')).join('; ');
+      const wcagTags = violation.tags.filter((t) => t.startsWith('wcag')).join('; ')
 
       for (const node of violation.nodes) {
         const row = [
@@ -278,11 +272,11 @@ export function convertToCsv(report: AllyReport): string {
           escapeCsv(node.target.join(' > ')),
           escapeCsv(wcagTags),
           escapeCsv(violation.helpUrl),
-        ];
-        rows.push(row.join(','));
+        ]
+        rows.push(row.join(','))
       }
     }
   }
 
-  return rows.join('\n');
+  return rows.join('\n')
 }

@@ -4,44 +4,47 @@
  * Supports Puppeteer (default, always available) and Playwright (optional, for Firefox/WebKit)
  */
 
-import type { Browser as PuppeteerBrowser, Page as PuppeteerPage } from 'puppeteer';
+import type { Browser as PuppeteerBrowser, Page as PuppeteerPage } from 'puppeteer'
 
-export type BrowserType = 'chromium' | 'firefox' | 'webkit';
+export type BrowserType = 'chromium' | 'firefox' | 'webkit'
 
 /**
  * Abstract page interface for browser-agnostic operations
  */
 export interface PageAdapter {
-  goto(url: string, options?: { waitUntil?: 'load' | 'domcontentloaded' | 'networkidle'; timeout?: number }): Promise<void>;
-  setContent(html: string, options?: { waitUntil?: 'load' | 'domcontentloaded' }): Promise<void>;
-  content(): Promise<string>;
-  waitForSelector(selector: string, options?: { timeout?: number }): Promise<void>;
-  evaluate<T>(fn: () => T): Promise<T>;
-  addStyleTag(options: { content: string }): Promise<void>;
-  setViewport(viewport: { width: number; height: number }): Promise<void>;
-  screenshot(options: { path: string; fullPage?: boolean }): Promise<void>;
-  close(): Promise<void>;
+  goto(
+    url: string,
+    options?: { waitUntil?: 'load' | 'domcontentloaded' | 'networkidle'; timeout?: number }
+  ): Promise<void>
+  setContent(html: string, options?: { waitUntil?: 'load' | 'domcontentloaded' }): Promise<void>
+  content(): Promise<string>
+  waitForSelector(selector: string, options?: { timeout?: number }): Promise<void>
+  evaluate<T>(fn: () => T): Promise<T>
+  addStyleTag(options: { content: string }): Promise<void>
+  setViewport(viewport: { width: number; height: number }): Promise<void>
+  screenshot(options: { path: string; fullPage?: boolean }): Promise<void>
+  close(): Promise<void>
 
   /**
    * Get the underlying page object for axe-core integration
    * Returns the Puppeteer Page or Playwright Page instance
    */
-  getUnderlyingPage(): unknown;
+  getUnderlyingPage(): unknown
 
   /**
    * Get the adapter type for conditional axe-core setup
    */
-  getAdapterType(): 'puppeteer' | 'playwright';
+  getAdapterType(): 'puppeteer' | 'playwright'
 }
 
 /**
  * Abstract browser interface
  */
 export interface BrowserAdapter {
-  launch(): Promise<void>;
-  newPage(): Promise<PageAdapter>;
-  close(): Promise<void>;
-  getBrowserType(): BrowserType;
+  launch(): Promise<void>
+  newPage(): Promise<PageAdapter>
+  close(): Promise<void>
+  getBrowserType(): BrowserType
 }
 
 /**
@@ -49,17 +52,19 @@ export interface BrowserAdapter {
  * Uses eval to avoid TypeScript module resolution errors
  */
 // eslint-disable-next-line @typescript-eslint/no-implied-eval
-const dynamicImport = new Function('modulePath', 'return import(modulePath)') as (modulePath: string) => Promise<unknown>;
+const dynamicImport = new Function('modulePath', 'return import(modulePath)') as (
+  modulePath: string
+) => Promise<unknown>
 
 /**
  * Check if Playwright is installed
  */
 export async function isPlaywrightInstalled(): Promise<boolean> {
   try {
-    await dynamicImport('playwright');
-    return true;
+    await dynamicImport('playwright')
+    return true
   } catch {
-    return false;
+    return false
   }
 }
 
@@ -76,8 +81,8 @@ export class PlaywrightNotInstalledError extends Error {
         `  npx playwright install ${browser}\n\n` +
         `Or use the default Chromium browser (no additional installation required):\n` +
         `  ally scan --browser chromium`
-    );
-    this.name = 'PlaywrightNotInstalledError';
+    )
+    this.name = 'PlaywrightNotInstalledError'
   }
 }
 
@@ -85,88 +90,95 @@ export class PlaywrightNotInstalledError extends Error {
  * Puppeteer adapter - wraps Puppeteer for chromium support
  */
 class PuppeteerPageAdapter implements PageAdapter {
-  private page: PuppeteerPage;
+  private page: PuppeteerPage
 
   constructor(page: PuppeteerPage) {
-    this.page = page;
+    this.page = page
   }
 
-  async goto(url: string, options?: { waitUntil?: 'load' | 'domcontentloaded' | 'networkidle'; timeout?: number }): Promise<void> {
+  async goto(
+    url: string,
+    options?: { waitUntil?: 'load' | 'domcontentloaded' | 'networkidle'; timeout?: number }
+  ): Promise<void> {
     // Map our waitUntil to Puppeteer's options
-    const waitUntil = options?.waitUntil === 'networkidle' ? 'networkidle2' : options?.waitUntil || 'load';
-    await this.page.goto(url, { waitUntil, timeout: options?.timeout });
+    const waitUntil =
+      options?.waitUntil === 'networkidle' ? 'networkidle2' : options?.waitUntil || 'load'
+    await this.page.goto(url, { waitUntil, timeout: options?.timeout })
   }
 
-  async setContent(html: string, options?: { waitUntil?: 'load' | 'domcontentloaded' }): Promise<void> {
-    await this.page.setContent(html, { waitUntil: options?.waitUntil || 'domcontentloaded' });
+  async setContent(
+    html: string,
+    options?: { waitUntil?: 'load' | 'domcontentloaded' }
+  ): Promise<void> {
+    await this.page.setContent(html, { waitUntil: options?.waitUntil || 'domcontentloaded' })
   }
 
   async content(): Promise<string> {
-    return this.page.content();
+    return this.page.content()
   }
 
   async waitForSelector(selector: string, options?: { timeout?: number }): Promise<void> {
-    await this.page.waitForSelector(selector, options);
+    await this.page.waitForSelector(selector, options)
   }
 
   async evaluate<T>(fn: () => T): Promise<T> {
-    return this.page.evaluate(fn);
+    return this.page.evaluate(fn)
   }
 
   async addStyleTag(options: { content: string }): Promise<void> {
-    await this.page.addStyleTag(options);
+    await this.page.addStyleTag(options)
   }
 
   async setViewport(viewport: { width: number; height: number }): Promise<void> {
-    await this.page.setViewport(viewport);
+    await this.page.setViewport(viewport)
   }
 
   async screenshot(options: { path: string; fullPage?: boolean }): Promise<void> {
-    await this.page.screenshot(options);
+    await this.page.screenshot(options)
   }
 
   async close(): Promise<void> {
-    await this.page.close();
+    await this.page.close()
   }
 
   getUnderlyingPage(): PuppeteerPage {
-    return this.page;
+    return this.page
   }
 
   getAdapterType(): 'puppeteer' | 'playwright' {
-    return 'puppeteer';
+    return 'puppeteer'
   }
 }
 
 class PuppeteerBrowserAdapter implements BrowserAdapter {
-  private browser: PuppeteerBrowser | null = null;
+  private browser: PuppeteerBrowser | null = null
 
   async launch(): Promise<void> {
     // Dynamic import to avoid loading at startup
-    const puppeteer = await import('puppeteer');
+    const puppeteer = await import('puppeteer')
     this.browser = await puppeteer.default.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    })
   }
 
   async newPage(): Promise<PageAdapter> {
     if (!this.browser) {
-      throw new Error('Browser not launched. Call launch() first.');
+      throw new Error('Browser not launched. Call launch() first.')
     }
-    const page = await this.browser.newPage();
-    return new PuppeteerPageAdapter(page);
+    const page = await this.browser.newPage()
+    return new PuppeteerPageAdapter(page)
   }
 
   async close(): Promise<void> {
     if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
+      await this.browser.close()
+      this.browser = null
     }
   }
 
   getBrowserType(): BrowserType {
-    return 'chromium';
+    return 'chromium'
   }
 }
 
@@ -175,151 +187,160 @@ class PuppeteerBrowserAdapter implements BrowserAdapter {
  * These are minimal interfaces for the parts we use
  */
 interface PlaywrightPage {
-  goto(url: string, options?: { waitUntil?: string; timeout?: number }): Promise<unknown>;
-  setContent(html: string, options?: { waitUntil?: string }): Promise<void>;
-  content(): Promise<string>;
-  waitForSelector(selector: string, options?: { timeout?: number }): Promise<unknown>;
-  evaluate<T>(fn: () => T): Promise<T>;
-  addStyleTag(options: { content: string }): Promise<unknown>;
-  setViewportSize(viewport: { width: number; height: number }): Promise<void>;
-  screenshot(options: { path: string; fullPage?: boolean }): Promise<Buffer>;
-  close(): Promise<void>;
+  goto(url: string, options?: { waitUntil?: string; timeout?: number }): Promise<unknown>
+  setContent(html: string, options?: { waitUntil?: string }): Promise<void>
+  content(): Promise<string>
+  waitForSelector(selector: string, options?: { timeout?: number }): Promise<unknown>
+  evaluate<T>(fn: () => T): Promise<T>
+  addStyleTag(options: { content: string }): Promise<unknown>
+  setViewportSize(viewport: { width: number; height: number }): Promise<void>
+  screenshot(options: { path: string; fullPage?: boolean }): Promise<Buffer>
+  close(): Promise<void>
 }
 
 interface PlaywrightBrowser {
-  newPage(): Promise<PlaywrightPage>;
-  close(): Promise<void>;
+  newPage(): Promise<PlaywrightPage>
+  close(): Promise<void>
 }
 
 interface PlaywrightBrowserType {
-  launch(options?: { headless?: boolean }): Promise<PlaywrightBrowser>;
+  launch(options?: { headless?: boolean }): Promise<PlaywrightBrowser>
 }
 
 interface PlaywrightModule {
-  chromium: PlaywrightBrowserType;
-  firefox: PlaywrightBrowserType;
-  webkit: PlaywrightBrowserType;
+  chromium: PlaywrightBrowserType
+  firefox: PlaywrightBrowserType
+  webkit: PlaywrightBrowserType
 }
 
 /**
  * Playwright adapter - supports chromium, firefox, and webkit
  */
 class PlaywrightPageAdapter implements PageAdapter {
-  private page: PlaywrightPage;
+  private page: PlaywrightPage
 
   constructor(page: PlaywrightPage) {
-    this.page = page;
+    this.page = page
   }
 
-  async goto(url: string, options?: { waitUntil?: 'load' | 'domcontentloaded' | 'networkidle'; timeout?: number }): Promise<void> {
+  async goto(
+    url: string,
+    options?: { waitUntil?: 'load' | 'domcontentloaded' | 'networkidle'; timeout?: number }
+  ): Promise<void> {
     // Playwright uses 'networkidle' directly
     await this.page.goto(url, {
       waitUntil: options?.waitUntil,
       timeout: options?.timeout,
-    });
+    })
   }
 
-  async setContent(html: string, options?: { waitUntil?: 'load' | 'domcontentloaded' }): Promise<void> {
-    await this.page.setContent(html, { waitUntil: options?.waitUntil || 'domcontentloaded' });
+  async setContent(
+    html: string,
+    options?: { waitUntil?: 'load' | 'domcontentloaded' }
+  ): Promise<void> {
+    await this.page.setContent(html, { waitUntil: options?.waitUntil || 'domcontentloaded' })
   }
 
   async content(): Promise<string> {
-    return this.page.content();
+    return this.page.content()
   }
 
   async waitForSelector(selector: string, options?: { timeout?: number }): Promise<void> {
-    await this.page.waitForSelector(selector, options ? { timeout: options.timeout } : undefined);
+    await this.page.waitForSelector(selector, options ? { timeout: options.timeout } : undefined)
   }
 
   async evaluate<T>(fn: () => T): Promise<T> {
-    return this.page.evaluate(fn);
+    return this.page.evaluate(fn)
   }
 
   async addStyleTag(options: { content: string }): Promise<void> {
-    await this.page.addStyleTag(options);
+    await this.page.addStyleTag(options)
   }
 
   async setViewport(viewport: { width: number; height: number }): Promise<void> {
-    await this.page.setViewportSize(viewport);
+    await this.page.setViewportSize(viewport)
   }
 
   async screenshot(options: { path: string; fullPage?: boolean }): Promise<void> {
-    await this.page.screenshot(options);
+    await this.page.screenshot(options)
   }
 
   async close(): Promise<void> {
-    await this.page.close();
+    await this.page.close()
   }
 
   getUnderlyingPage(): PlaywrightPage {
-    return this.page;
+    return this.page
   }
 
   getAdapterType(): 'puppeteer' | 'playwright' {
-    return 'playwright';
+    return 'playwright'
   }
 }
 
 class PlaywrightBrowserAdapter implements BrowserAdapter {
-  private browser: PlaywrightBrowser | null = null;
-  private browserType: BrowserType;
+  private browser: PlaywrightBrowser | null = null
+  private browserType: BrowserType
 
   constructor(browserType: BrowserType) {
-    this.browserType = browserType;
+    this.browserType = browserType
   }
 
   async launch(): Promise<void> {
     // Dynamic import to avoid loading at startup
-    let playwright: PlaywrightModule;
+    let playwright: PlaywrightModule
     try {
-      playwright = await dynamicImport('playwright') as PlaywrightModule;
+      playwright = (await dynamicImport('playwright')) as PlaywrightModule
     } catch {
-      throw new PlaywrightNotInstalledError(this.browserType);
+      throw new PlaywrightNotInstalledError(this.browserType)
     }
 
     // Select the appropriate browser engine
-    const browserLauncher = playwright[this.browserType];
+    const browserLauncher = playwright[this.browserType]
     if (!browserLauncher) {
-      throw new Error(`Unknown browser type: ${this.browserType}`);
+      throw new Error(`Unknown browser type: ${this.browserType}`)
     }
 
     try {
       this.browser = await browserLauncher.launch({
         headless: true,
-      });
+      })
     } catch (error) {
       // Check if the error is about missing browser binaries
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('Executable doesn\'t exist') || errorMessage.includes('browserType.launch')) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (
+        errorMessage.includes("Executable doesn't exist") ||
+        errorMessage.includes('browserType.launch')
+      ) {
         throw new Error(
           `${this.browserType} browser binaries are not installed.\n\n` +
             `To install them, run:\n` +
             `  npx playwright install ${this.browserType}\n\n` +
             `Or install all browsers:\n` +
             `  npx playwright install`
-        );
+        )
       }
-      throw error;
+      throw error
     }
   }
 
   async newPage(): Promise<PageAdapter> {
     if (!this.browser) {
-      throw new Error('Browser not launched. Call launch() first.');
+      throw new Error('Browser not launched. Call launch() first.')
     }
-    const page = await this.browser.newPage();
-    return new PlaywrightPageAdapter(page);
+    const page = await this.browser.newPage()
+    return new PlaywrightPageAdapter(page)
   }
 
   async close(): Promise<void> {
     if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
+      await this.browser.close()
+      this.browser = null
     }
   }
 
   getBrowserType(): BrowserType {
-    return this.browserType;
+    return this.browserType
   }
 }
 
@@ -333,24 +354,26 @@ class PlaywrightBrowserAdapter implements BrowserAdapter {
  * Firefox and WebKit require Playwright to be installed.
  * Use --browser chromium-playwright to force Playwright for Chromium.
  */
-export function createBrowser(type: BrowserType | 'chromium-playwright' = 'chromium'): BrowserAdapter {
+export function createBrowser(
+  type: BrowserType | 'chromium-playwright' = 'chromium'
+): BrowserAdapter {
   // For chromium, use Puppeteer by default (lighter weight, always available)
   if (type === 'chromium') {
-    return new PuppeteerBrowserAdapter();
+    return new PuppeteerBrowserAdapter()
   }
 
   // For chromium-playwright, firefox, or webkit, use Playwright
-  const playwrightType = type === 'chromium-playwright' ? 'chromium' : type;
-  return new PlaywrightBrowserAdapter(playwrightType);
+  const playwrightType = type === 'chromium-playwright' ? 'chromium' : type
+  return new PlaywrightBrowserAdapter(playwrightType)
 }
 
 /**
  * Validate browser type option
  */
 export function validateBrowserType(value: string): BrowserType {
-  const valid: BrowserType[] = ['chromium', 'firefox', 'webkit'];
+  const valid: BrowserType[] = ['chromium', 'firefox', 'webkit']
   if (!valid.includes(value as BrowserType)) {
-    throw new Error(`Invalid browser: ${value}. Valid options: ${valid.join(', ')}`);
+    throw new Error(`Invalid browser: ${value}. Valid options: ${valid.join(', ')}`)
   }
-  return value as BrowserType;
+  return value as BrowserType
 }

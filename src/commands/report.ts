@@ -2,81 +2,71 @@
  * ally report command - Generates ACCESSIBILITY.md report
  */
 
-import { readFile, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import { resolve, dirname, basename, relative } from 'path';
-import chalk from 'chalk';
-import {
-  printBanner,
-  createSpinner,
-  printError,
-  printInfo,
-  printSuccess,
-} from '../utils/ui.js';
-import { suggestInit, suggestRescan } from '../utils/errors.js';
-import { convertToSarif, convertToJunit, convertToCsv } from '../utils/converters.js';
-import { generateConformanceReport } from '../utils/vpat-mappings.js';
-import { generateVpatHtml, calculateSummary, type VpatMetadata } from '../utils/vpat-template.js';
-import type { AllyReport, Severity } from '../types/index.js';
+import chalk from 'chalk'
+import { existsSync } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
+import { basename, dirname, relative, resolve } from 'path'
+import type { AllyReport, Severity } from '../types/index.js'
+import { convertToCsv, convertToJunit, convertToSarif } from '../utils/converters.js'
+import { suggestInit, suggestRescan } from '../utils/errors.js'
+import { createSpinner, printBanner, printError, printInfo, printSuccess } from '../utils/ui.js'
+import { generateConformanceReport } from '../utils/vpat-mappings.js'
+import { calculateSummary, generateVpatHtml, type VpatMetadata } from '../utils/vpat-template.js'
 
-type ReportFormat = 'markdown' | 'html' | 'json' | 'sarif' | 'junit' | 'csv' | 'vpat' | 'all';
+type ReportFormat = 'markdown' | 'html' | 'json' | 'sarif' | 'junit' | 'csv' | 'vpat' | 'all'
 
 interface ReportOptions {
-  input?: string;
-  output?: string;
-  format?: ReportFormat;
+  input?: string
+  output?: string
+  format?: ReportFormat
   // VPAT-specific options
-  productName?: string;
-  productVersion?: string;
-  vendor?: string;
-  contact?: string;
-  evalDate?: string;
+  productName?: string
+  productVersion?: string
+  vendor?: string
+  contact?: string
+  evalDate?: string
 }
 
 export async function reportCommand(options: ReportOptions = {}): Promise<void> {
-  printBanner();
+  printBanner()
 
-  const {
-    input = '.ally/scan.json',
-    output = 'ACCESSIBILITY.md',
-    format = 'markdown',
-  } = options;
+  const { input = '.ally/scan.json', output = 'ACCESSIBILITY.md', format = 'markdown' } = options
 
   // Load scan results
-  const spinner = createSpinner('Loading scan results...');
-  spinner.start();
+  const spinner = createSpinner('Loading scan results...')
+  spinner.start()
 
-  const reportPath = resolve(input);
+  const reportPath = resolve(input)
 
   if (!existsSync(reportPath)) {
-    spinner.stop();
-    suggestInit(reportPath);
-    return;
+    spinner.stop()
+    suggestInit(reportPath)
+    return
   }
 
-  let report: AllyReport;
+  let report: AllyReport
   try {
-    const content = await readFile(reportPath, 'utf-8');
-    report = JSON.parse(content) as AllyReport;
-    spinner.succeed('Loaded scan results');
+    const content = await readFile(reportPath, 'utf-8')
+    report = JSON.parse(content) as AllyReport
+    spinner.succeed('Loaded scan results')
   } catch (error) {
-    spinner.fail('Failed to load scan results');
+    spinner.fail('Failed to load scan results')
     if (error instanceof SyntaxError) {
-      suggestRescan(reportPath);
+      suggestRescan(reportPath)
     } else {
-      printError(error instanceof Error ? error.message : String(error));
+      printError(error instanceof Error ? error.message : String(error))
     }
-    return;
+    return
   }
 
   // Generate report
-  const generateSpinner = createSpinner('Generating report...');
-  generateSpinner.start();
+  const generateSpinner = createSpinner('Generating report...')
+  generateSpinner.start()
 
   // Handle batch export (--format all)
   if (format === 'all') {
-    const outputDir = dirname(resolve(output));
-    const generatedFiles: string[] = [];
+    const outputDir = dirname(resolve(output))
+    const generatedFiles: string[] = []
 
     try {
       // Generate all formats
@@ -84,107 +74,117 @@ export async function reportCommand(options: ReportOptions = {}): Promise<void> 
         { name: 'ACCESSIBILITY.md', ext: 'md', content: generateMarkdownReport(report) },
         { name: 'accessibility.html', ext: 'html', content: generateHtmlReport(report) },
         { name: 'accessibility.json', ext: 'json', content: JSON.stringify(report, null, 2) },
-        { name: 'accessibility.sarif', ext: 'sarif', content: JSON.stringify(convertToSarif(report), null, 2) },
+        {
+          name: 'accessibility.sarif',
+          ext: 'sarif',
+          content: JSON.stringify(convertToSarif(report), null, 2),
+        },
         { name: 'accessibility.junit.xml', ext: 'xml', content: convertToJunit(report) },
         { name: 'accessibility.csv', ext: 'csv', content: convertToCsv(report) },
-      ];
+      ]
 
       for (const { name, content } of formats) {
-        const filePath = resolve(outputDir, name);
-        await writeFile(filePath, content);
-        generatedFiles.push(name);
+        const filePath = resolve(outputDir, name)
+        await writeFile(filePath, content)
+        generatedFiles.push(name)
       }
 
-      generateSpinner.succeed('Generated all report formats');
+      generateSpinner.succeed('Generated all report formats')
 
-      console.log();
-      console.log(chalk.green(`\u2713 Generated ${generatedFiles.length} report files:`));
+      console.log()
+      console.log(chalk.green(`\u2713 Generated ${generatedFiles.length} report files:`))
       for (const file of generatedFiles) {
-        console.log(chalk.dim(`  \u2022 ${file}`));
+        console.log(chalk.dim(`  \u2022 ${file}`))
       }
     } catch (error) {
-      generateSpinner.fail('Failed to write reports');
-      printError(error instanceof Error ? error.message : String(error));
-      return;
+      generateSpinner.fail('Failed to write reports')
+      printError(error instanceof Error ? error.message : String(error))
+      return
     }
   } else {
     // Single format export
-    let reportContent: string;
+    let reportContent: string
 
     switch (format) {
       case 'json':
-        reportContent = JSON.stringify(report, null, 2);
-        break;
+        reportContent = JSON.stringify(report, null, 2)
+        break
       case 'html':
-        reportContent = generateHtmlReport(report);
-        break;
+        reportContent = generateHtmlReport(report)
+        break
       case 'sarif':
-        reportContent = JSON.stringify(convertToSarif(report), null, 2);
-        break;
+        reportContent = JSON.stringify(convertToSarif(report), null, 2)
+        break
       case 'junit':
-        reportContent = convertToJunit(report);
-        break;
+        reportContent = convertToJunit(report)
+        break
       case 'csv':
-        reportContent = convertToCsv(report);
-        break;
+        reportContent = convertToCsv(report)
+        break
       case 'vpat':
-        reportContent = generateVpatReport(report, options);
-        break;
+        reportContent = generateVpatReport(report, options)
+        break
       case 'markdown':
       default:
-        reportContent = generateMarkdownReport(report);
+        reportContent = generateMarkdownReport(report)
     }
 
     // Adjust output filename based on format
-    let outputPath = resolve(output);
+    let outputPath = resolve(output)
     if (format === 'sarif' && !output.endsWith('.sarif')) {
-      outputPath = resolve(dirname(output), 'accessibility.sarif');
+      outputPath = resolve(dirname(output), 'accessibility.sarif')
     } else if (format === 'junit' && !output.endsWith('.xml')) {
-      outputPath = resolve(dirname(output), 'accessibility.junit.xml');
+      outputPath = resolve(dirname(output), 'accessibility.junit.xml')
     } else if (format === 'csv' && !output.endsWith('.csv')) {
-      outputPath = resolve(dirname(output), 'accessibility.csv');
+      outputPath = resolve(dirname(output), 'accessibility.csv')
     } else if (format === 'json' && !output.endsWith('.json')) {
-      outputPath = resolve(dirname(output), 'accessibility.json');
+      outputPath = resolve(dirname(output), 'accessibility.json')
     } else if (format === 'html' && !output.endsWith('.html')) {
-      outputPath = resolve(dirname(output), 'accessibility.html');
+      outputPath = resolve(dirname(output), 'accessibility.html')
     } else if (format === 'vpat' && !output.endsWith('.html')) {
-      outputPath = resolve(dirname(output), 'accessibility-vpat.html');
+      outputPath = resolve(dirname(output), 'accessibility-vpat.html')
     }
 
     try {
-      await writeFile(outputPath, reportContent);
-      generateSpinner.succeed(`Report generated: ${outputPath}`);
+      await writeFile(outputPath, reportContent)
+      generateSpinner.succeed(`Report generated: ${outputPath}`)
     } catch (error) {
-      generateSpinner.fail('Failed to write report');
-      printError(error instanceof Error ? error.message : String(error));
-      return;
+      generateSpinner.fail('Failed to write report')
+      printError(error instanceof Error ? error.message : String(error))
+      return
     }
 
-    console.log();
-    printSuccess('Accessibility report ready!');
-    printInfo(`Add ${basename(outputPath)} to your repository to document your a11y compliance`);
+    console.log()
+    printSuccess('Accessibility report ready!')
+    printInfo(`Add ${basename(outputPath)} to your repository to document your a11y compliance`)
   }
 
   // Generate badge URL
-  const badgeColor = report.summary.score >= 90 ? 'brightgreen'
-    : report.summary.score >= 75 ? 'green'
-    : report.summary.score >= 50 ? 'yellow'
-    : 'red';
+  const badgeColor =
+    report.summary.score >= 90
+      ? 'brightgreen'
+      : report.summary.score >= 75
+        ? 'green'
+        : report.summary.score >= 50
+          ? 'yellow'
+          : 'red'
 
-  console.log();
-  console.log(chalk.bold('Badge for README:'));
-  console.log(chalk.dim(`![Accessibility Score](https://img.shields.io/badge/a11y_score-${report.summary.score}%25-${badgeColor})`));
+  console.log()
+  console.log(chalk.bold('Badge for README:'))
+  console.log(
+    chalk.dim(
+      `![Accessibility Score](https://img.shields.io/badge/a11y_score-${report.summary.score}%25-${badgeColor})`
+    )
+  )
 }
 
 function generateMarkdownReport(report: AllyReport): string {
-  const { summary } = report;
-  const scanDate = new Date(report.scanDate).toLocaleDateString();
+  const { summary } = report
+  const scanDate = new Date(report.scanDate).toLocaleDateString()
 
   // Score emoji
-  const scoreEmoji = summary.score >= 90 ? '🌟'
-    : summary.score >= 75 ? '✅'
-    : summary.score >= 50 ? '⚠️'
-    : '❌';
+  const scoreEmoji =
+    summary.score >= 90 ? '🌟' : summary.score >= 75 ? '✅' : summary.score >= 50 ? '⚠️' : '❌'
 
   let md = `# Accessibility Report ${scoreEmoji}
 
@@ -206,89 +206,89 @@ function generateMarkdownReport(report: AllyReport): string {
 
 ## Top Issues
 
-`;
+`
 
   if (summary.topIssues.length > 0) {
     for (const issue of summary.topIssues) {
-      const severityIcon = getSeverityIcon(issue.severity);
-      md += `### ${severityIcon} ${issue.description}\n\n`;
-      md += `- **Occurrences:** ${issue.count}\n`;
-      md += `- **Rule ID:** \`${issue.id}\`\n\n`;
+      const severityIcon = getSeverityIcon(issue.severity)
+      md += `### ${severityIcon} ${issue.description}\n\n`
+      md += `- **Occurrences:** ${issue.count}\n`
+      md += `- **Rule ID:** \`${issue.id}\`\n\n`
     }
   } else {
-    md += `No issues found! 🎉\n\n`;
+    md += `No issues found! 🎉\n\n`
   }
 
   // Files scanned
-  md += `## Files Scanned\n\n`;
-  md += `Total: ${report.totalFiles} files\n\n`;
+  md += `## Files Scanned\n\n`
+  md += `Total: ${report.totalFiles} files\n\n`
 
   if (report.results.length > 0) {
-    md += `| File | Issues |\n`;
-    md += `|------|--------|\n`;
+    md += `| File | Issues |\n`
+    md += `|------|--------|\n`
 
     for (const result of report.results) {
       // Convert absolute paths to relative for cleaner reports
-      let fileName: string;
+      let fileName: string
       if (result.file) {
-        fileName = relative(process.cwd(), result.file) || result.file;
+        fileName = relative(process.cwd(), result.file) || result.file
       } else if (result.url) {
-        fileName = result.url;
+        fileName = result.url
       } else {
-        fileName = 'unknown';
+        fileName = 'unknown'
       }
-      const issueCount = result.violations.length;
-      const icon = issueCount === 0 ? '✅' : issueCount < 5 ? '⚠️' : '❌';
-      md += `| ${icon} ${fileName} | ${issueCount} |\n`;
+      const issueCount = result.violations.length
+      const icon = issueCount === 0 ? '✅' : issueCount < 5 ? '⚠️' : '❌'
+      md += `| ${icon} ${fileName} | ${issueCount} |\n`
     }
   }
 
   // WCAG Compliance
-  md += `\n## WCAG 2.1 Compliance\n\n`;
+  md += `\n## WCAG 2.1 Compliance\n\n`
 
-  const wcagViolations = new Set<string>();
+  const wcagViolations = new Set<string>()
   for (const result of report.results) {
     for (const violation of result.violations) {
       for (const tag of violation.tags) {
         if (tag.startsWith('wcag')) {
-          wcagViolations.add(tag);
+          wcagViolations.add(tag)
         }
       }
     }
   }
 
   if (wcagViolations.size > 0) {
-    md += `The following WCAG criteria have violations:\n\n`;
+    md += `The following WCAG criteria have violations:\n\n`
     for (const criterion of Array.from(wcagViolations).sort()) {
-      md += `- \`${criterion}\`\n`;
+      md += `- \`${criterion}\`\n`
     }
   } else {
-    md += `No WCAG violations detected! ✅\n`;
+    md += `No WCAG violations detected! ✅\n`
   }
 
   // Next steps
-  md += `\n## Next Steps\n\n`;
+  md += `\n## Next Steps\n\n`
 
   if (summary.totalViolations > 0) {
-    md += `1. Run \`ally explain\` to understand each issue\n`;
-    md += `2. Run \`ally fix\` to apply automated fixes\n`;
-    md += `3. Re-scan with \`ally scan\` to verify fixes\n`;
+    md += `1. Run \`ally explain\` to understand each issue\n`
+    md += `2. Run \`ally fix\` to apply automated fixes\n`
+    md += `3. Re-scan with \`ally scan\` to verify fixes\n`
   } else {
-    md += `Your site is looking great! Consider:\n`;
-    md += `- Testing with real screen readers (NVDA, VoiceOver)\n`;
-    md += `- Running manual keyboard navigation tests\n`;
-    md += `- Getting user feedback from people with disabilities\n`;
+    md += `Your site is looking great! Consider:\n`
+    md += `- Testing with real screen readers (NVDA, VoiceOver)\n`
+    md += `- Running manual keyboard navigation tests\n`
+    md += `- Getting user feedback from people with disabilities\n`
   }
 
   // Footer
-  md += `\n---\n\n`;
-  md += `*This report was automatically generated. Automated testing can only catch ~50% of accessibility issues. Manual testing is recommended.*\n`;
+  md += `\n---\n\n`
+  md += `*This report was automatically generated. Automated testing can only catch ~50% of accessibility issues. Manual testing is recommended.*\n`
 
-  return md;
+  return md
 }
 
 function generateHtmlReport(report: AllyReport): string {
-  const { summary } = report;
+  const { summary } = report
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -382,13 +382,17 @@ function generateHtmlReport(report: AllyReport): string {
       </tr>
     </thead>
     <tbody>
-      ${summary.topIssues.map(issue => `
+      ${summary.topIssues
+        .map(
+          (issue) => `
         <tr>
           <td>${issue.description}</td>
           <td>${issue.severity}</td>
           <td>${issue.count}</td>
         </tr>
-      `).join('')}
+      `
+        )
+        .join('')}
     </tbody>
   </table>
 
@@ -396,21 +400,21 @@ function generateHtmlReport(report: AllyReport): string {
     <p><em>Generated by ally on ${new Date(report.scanDate).toLocaleDateString()}</em></p>
   </footer>
 </body>
-</html>`;
+</html>`
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 90) return 'brightgreen';
-  if (score >= 75) return 'green';
-  if (score >= 50) return 'yellow';
-  return 'red';
+  if (score >= 90) return 'brightgreen'
+  if (score >= 75) return 'green'
+  if (score >= 50) return 'yellow'
+  return 'red'
 }
 
 function getScoreGradient(score: number): string {
-  if (score >= 90) return 'linear-gradient(135deg, #16a34a, #22c55e)';
-  if (score >= 75) return 'linear-gradient(135deg, #65a30d, #84cc16)';
-  if (score >= 50) return 'linear-gradient(135deg, #ca8a04, #eab308)';
-  return 'linear-gradient(135deg, #dc2626, #ef4444)';
+  if (score >= 90) return 'linear-gradient(135deg, #16a34a, #22c55e)'
+  if (score >= 75) return 'linear-gradient(135deg, #65a30d, #84cc16)'
+  if (score >= 50) return 'linear-gradient(135deg, #ca8a04, #eab308)'
+  return 'linear-gradient(135deg, #dc2626, #ef4444)'
 }
 
 function getSeverityIcon(severity: Severity): string {
@@ -419,24 +423,24 @@ function getSeverityIcon(severity: Severity): string {
     serious: '🟠',
     moderate: '🟡',
     minor: '🔵',
-  };
-  return icons[severity] || '⚪';
+  }
+  return icons[severity] || '⚪'
 }
 
 function generateVpatReport(report: AllyReport, options: ReportOptions): string {
   // Extract all unique violation rule IDs from scan results
-  const violationIds: string[] = [];
+  const violationIds: string[] = []
   for (const result of report.results) {
     for (const violation of result.violations) {
       if (!violationIds.includes(violation.id)) {
-        violationIds.push(violation.id);
+        violationIds.push(violation.id)
       }
     }
   }
 
   // Generate conformance results
-  const conformanceResults = generateConformanceReport(violationIds, 'AA');
-  const summary = calculateSummary(conformanceResults);
+  const conformanceResults = generateConformanceReport(violationIds, 'AA')
+  const summary = calculateSummary(conformanceResults)
 
   // Build metadata
   const metadata: VpatMetadata = {
@@ -447,13 +451,13 @@ function generateVpatReport(report: AllyReport, options: ReportOptions): string 
     evaluationDate: options.evalDate || new Date().toISOString().split('T')[0],
     evaluationMethods: ['Automated testing with ally (axe-core)'],
     notes: `Based on scan of ${report.totalFiles} file(s) on ${new Date(report.scanDate).toLocaleDateString()}. Accessibility score: ${report.summary.score}/100.`,
-  };
+  }
 
   return generateVpatHtml({
     metadata,
     conformanceResults,
     summary,
-  });
+  })
 }
 
-export default reportCommand;
+export default reportCommand

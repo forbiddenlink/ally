@@ -14,8 +14,10 @@
     "ACCESSIBILITY.md"
   ],
   "scripts": {
+    "audit": "pnpm audit --audit-level high",
     "build": "tsc",
     "build:all": "npm run build && cd mcp-server && npm run build",
+    "check": "pnpm biome:check && pnpm lint && pnpm test && pnpm build",
     "dev": "tsc -w",
     "start": "node dist/cli.js",
     "test": "node --test --import tsx test/*.test.ts",
@@ -25,6 +27,7 @@
     "lint": "tsc --noEmit",
     "benchmark": "tsx benchmark/scan-speed.ts",
     "benchmark:ci": "tsx benchmark/scan-speed.ts --json --threshold 20",
+    "security": "pnpm audit --audit-level high",
     "prepublishOnly": "npm run build:all",
     "postinstall": "node -e \"console.log('\\n\u2705 ally-a11y installed! Run \\x1b[36mally init\\x1b[0m to get started.\\n')\"",
     "biome:check": "biome check .",
@@ -84,7 +87,7 @@
     "inquirer": "^14.0.2",
     "ora": "^8.2.0",
     "pa11y": "^9.1.1",
-    "puppeteer": "^25.2.1",
+    "puppeteer": "^25.9.0",
     "simple-git": "^3.36.0"
   },
   "devDependencies": {
@@ -120,7 +123,8 @@
       "brace-expansion": ">=1.1.18 <2",
       "fast-uri": ">=2.4.4 <3",
       "ip-address": ">=10.3.1 <11",
-      "js-yaml": ">=4.3.1 <5"
+      "js-yaml": ">=4.3.1 <5",
+      "puppeteer": "25.9.0"
     }
   },
   "packageManager": "pnpm@10.32.1"

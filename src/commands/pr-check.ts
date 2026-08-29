@@ -2,34 +2,34 @@
  * ally pr-check command - Post accessibility results to GitHub PR
  */
 
-import { readFile, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import { resolve } from 'path';
-import { execSync } from 'child_process';
-import chalk from 'chalk';
-import boxen from 'boxen';
+import boxen from 'boxen'
+import chalk from 'chalk'
+import { execSync } from 'child_process'
+import { existsSync } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
+import { resolve } from 'path'
+import type { AllyReport, Severity } from '../types/index.js'
+import { suggestInit } from '../utils/errors.js'
 import {
-  printBanner,
   createSpinner,
+  printBanner,
   printError,
-  printSuccess,
   printInfo,
+  printSuccess,
   printWarning,
-} from '../utils/ui.js';
-import { suggestInit } from '../utils/errors.js';
-import type { AllyReport, Severity } from '../types/index.js';
+} from '../utils/ui.js'
 
 interface PrCheckOptions {
-  input?: string;
-  pr?: number;
-  comment?: boolean;
-  failOn?: string;
-  token?: string;
+  input?: string
+  pr?: number
+  comment?: boolean
+  failOn?: string
+  token?: string
 }
 
 interface GitHubRepo {
-  owner: string;
-  repo: string;
+  owner: string
+  repo: string
 }
 
 /**
@@ -37,25 +37,25 @@ interface GitHubRepo {
  */
 function getGitHubRepo(): GitHubRepo | null {
   try {
-    const remote = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim();
+    const remote = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim()
 
     // Parse GitHub URL (supports both HTTPS and SSH)
     // https://github.com/owner/repo.git
     // git@github.com:owner/repo.git
-    const httpsMatch = remote.match(/github\.com\/([^/]+)\/([^/.]+)/);
-    const sshMatch = remote.match(/github\.com:([^/]+)\/([^/.]+)/);
+    const httpsMatch = remote.match(/github\.com\/([^/]+)\/([^/.]+)/)
+    const sshMatch = remote.match(/github\.com:([^/]+)\/([^/.]+)/)
 
-    const match = httpsMatch || sshMatch;
+    const match = httpsMatch || sshMatch
     if (match) {
       return {
         owner: match[1],
         repo: match[2].replace(/\.git$/, ''),
-      };
+      }
     }
   } catch {
     // Not in a git repo or no remote
   }
-  return null;
+  return null
 }
 
 /**
@@ -64,11 +64,11 @@ function getGitHubRepo(): GitHubRepo | null {
 function getCurrentPR(): number | null {
   // Check GitHub Actions environment
   if (process.env.GITHUB_EVENT_NAME === 'pull_request') {
-    const eventPath = process.env.GITHUB_EVENT_PATH;
+    const eventPath = process.env.GITHUB_EVENT_PATH
     if (eventPath && existsSync(eventPath)) {
       try {
-        const event = JSON.parse(require('fs').readFileSync(eventPath, 'utf-8'));
-        return event.pull_request?.number || null;
+        const event = JSON.parse(require('fs').readFileSync(eventPath, 'utf-8'))
+        return event.pull_request?.number || null
       } catch {
         // Ignore
       }
@@ -76,15 +76,15 @@ function getCurrentPR(): number | null {
   }
 
   // Check GITHUB_REF for PR number
-  const ref = process.env.GITHUB_REF;
+  const ref = process.env.GITHUB_REF
   if (ref) {
-    const prMatch = ref.match(/refs\/pull\/(\d+)/);
+    const prMatch = ref.match(/refs\/pull\/(\d+)/)
     if (prMatch) {
-      return parseInt(prMatch[1], 10);
+      return parseInt(prMatch[1], 10)
     }
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -96,16 +96,23 @@ function getSeverityEmoji(severity: Severity): string {
     serious: ':orange_circle:',
     moderate: ':yellow_circle:',
     minor: ':blue_circle:',
-  };
-  return emojis[severity] || ':white_circle:';
+  }
+  return emojis[severity] || ':white_circle:'
 }
 
 /**
  * Generate markdown comment for PR
  */
 function generatePRComment(report: AllyReport): string {
-  const { summary } = report;
-  const scoreEmoji = summary.score >= 90 ? ':star:' : summary.score >= 75 ? ':white_check_mark:' : summary.score >= 50 ? ':warning:' : ':x:';
+  const { summary } = report
+  const scoreEmoji =
+    summary.score >= 90
+      ? ':star:'
+      : summary.score >= 75
+        ? ':white_check_mark:'
+        : summary.score >= 50
+          ? ':warning:'
+          : ':x:'
 
   let comment = `## ${scoreEmoji} Accessibility Report
 
@@ -118,17 +125,17 @@ function generatePRComment(report: AllyReport): string {
 | :yellow_circle: Moderate | ${summary.bySeverity.moderate || 0} |
 | :blue_circle: Minor | ${summary.bySeverity.minor || 0} |
 
-`;
+`
 
   if (summary.topIssues.length > 0) {
-    comment += `### Top Issues\n\n`;
+    comment += `### Top Issues\n\n`
 
     for (const issue of summary.topIssues.slice(0, 5)) {
-      const emoji = getSeverityEmoji(issue.severity);
-      comment += `- ${emoji} **${issue.id}**: ${issue.description} (${issue.count} occurrences)\n`;
+      const emoji = getSeverityEmoji(issue.severity)
+      comment += `- ${emoji} **${issue.id}**: ${issue.description} (${issue.count} occurrences)\n`
     }
 
-    comment += '\n';
+    comment += '\n'
   }
 
   if (summary.totalViolations > 0) {
@@ -145,13 +152,13 @@ ally fix
 
 </details>
 
-`;
+`
   }
 
   comment += `---
-*Generated by [ally](https://github.com/forbiddenlink/ally) :robot:*`;
+*Generated by [ally](https://github.com/forbiddenlink/ally) :robot:*`
 
-  return comment;
+  return comment
 }
 
 /**
@@ -164,28 +171,28 @@ async function postPRComment(
 ): Promise<boolean> {
   try {
     // Write comment to temp file to avoid shell escaping issues
-    const tempFile = resolve('.ally/pr-comment.md');
-    await writeFile(tempFile, comment);
+    const tempFile = resolve('.ally/pr-comment.md')
+    await writeFile(tempFile, comment)
 
     // Use gh CLI to post comment
     execSync(
       `gh pr comment ${prNumber} --repo ${repo.owner}/${repo.repo} --body-file "${tempFile}"`,
       { encoding: 'utf-8', stdio: 'pipe' }
-    );
+    )
 
-    return true;
+    return true
   } catch (error) {
     if (error instanceof Error) {
       // Check for common errors
       if (error.message.includes('gh: command not found')) {
-        printError('GitHub CLI (gh) not found. Install it from https://cli.github.com/');
+        printError('GitHub CLI (gh) not found. Install it from https://cli.github.com/')
       } else if (error.message.includes('not logged in')) {
-        printError('Not logged in to GitHub CLI. Run: gh auth login');
+        printError('Not logged in to GitHub CLI. Run: gh auth login')
       } else {
-        printError(`Failed to post comment: ${error.message}`);
+        printError(`Failed to post comment: ${error.message}`)
       }
     }
-    return false;
+    return false
   }
 }
 
@@ -193,10 +200,10 @@ async function postPRComment(
  * Create GitHub check annotations for violations
  */
 function generateAnnotations(report: AllyReport): string {
-  const annotations: string[] = [];
+  const annotations: string[] = []
 
   for (const result of report.results) {
-    const file = result.file || 'unknown';
+    const file = result.file || 'unknown'
 
     for (const violation of result.violations) {
       for (const node of violation.nodes) {
@@ -205,140 +212,142 @@ function generateAnnotations(report: AllyReport): string {
           path: file,
           start_line: 1, // Would need source map for actual line
           end_line: 1,
-          annotation_level: violation.impact === 'critical' || violation.impact === 'serious' ? 'failure' : 'warning',
+          annotation_level:
+            violation.impact === 'critical' || violation.impact === 'serious'
+              ? 'failure'
+              : 'warning',
           message: `${violation.id}: ${violation.help}\n\nElement: ${node.html.substring(0, 100)}...`,
           title: violation.description,
-        };
-        annotations.push(JSON.stringify(annotation));
+        }
+        annotations.push(JSON.stringify(annotation))
       }
     }
   }
 
-  return annotations.join('\n');
+  return annotations.join('\n')
 }
 
 export async function prCheckCommand(options: PrCheckOptions = {}): Promise<void> {
-  printBanner();
+  printBanner()
 
-  const { input = '.ally/scan.json', pr, comment = true, failOn } = options;
+  const { input = '.ally/scan.json', pr, comment = true, failOn } = options
 
   // Load scan results
-  const spinner = createSpinner('Loading scan results...');
-  spinner.start();
+  const spinner = createSpinner('Loading scan results...')
+  spinner.start()
 
-  const reportPath = resolve(input);
+  const reportPath = resolve(input)
 
   if (!existsSync(reportPath)) {
-    spinner.stop();
-    suggestInit(reportPath);
-    return;
+    spinner.stop()
+    suggestInit(reportPath)
+    return
   }
 
-  let report: AllyReport;
+  let report: AllyReport
   try {
-    const content = await readFile(reportPath, 'utf-8');
-    report = JSON.parse(content) as AllyReport;
-    spinner.succeed('Loaded scan results');
+    const content = await readFile(reportPath, 'utf-8')
+    report = JSON.parse(content) as AllyReport
+    spinner.succeed('Loaded scan results')
   } catch (error) {
-    spinner.fail('Failed to load scan results');
-    printError(error instanceof Error ? error.message : String(error));
-    return;
+    spinner.fail('Failed to load scan results')
+    printError(error instanceof Error ? error.message : String(error))
+    return
   }
 
   // Get GitHub repo info
-  const repo = getGitHubRepo();
+  const repo = getGitHubRepo()
   if (!repo) {
-    printWarning('Not a GitHub repository. Skipping PR integration.');
-    console.log();
-    printInfo('This command works best in a GitHub repository with a PR open.');
-    return;
+    printWarning('Not a GitHub repository. Skipping PR integration.')
+    console.log()
+    printInfo('This command works best in a GitHub repository with a PR open.')
+    return
   }
 
   // Get PR number
-  const prNumber = pr || getCurrentPR();
+  const prNumber = pr || getCurrentPR()
   if (!prNumber) {
-    printWarning('No PR number detected. Use --pr <number> to specify.');
-    console.log();
-    printInfo('Run this command from a GitHub Actions PR workflow or specify --pr manually.');
+    printWarning('No PR number detected. Use --pr <number> to specify.')
+    console.log()
+    printInfo('Run this command from a GitHub Actions PR workflow or specify --pr manually.')
 
     // Still show the report summary
-    console.log();
+    console.log()
     console.log(
       boxen(
         `${chalk.bold('Accessibility Report')}\n\n` +
-        `Score: ${report.summary.score}/100\n` +
-        `Violations: ${report.summary.totalViolations}`,
+          `Score: ${report.summary.score}/100\n` +
+          `Violations: ${report.summary.totalViolations}`,
         {
           padding: 1,
           borderStyle: 'round',
           borderColor: report.summary.score >= 75 ? 'green' : 'yellow',
         }
       )
-    );
-    return;
+    )
+    return
   }
 
-  console.log();
-  printInfo(`Posting results to ${repo.owner}/${repo.repo}#${prNumber}`);
+  console.log()
+  printInfo(`Posting results to ${repo.owner}/${repo.repo}#${prNumber}`)
 
   // Post PR comment
   if (comment) {
-    const commentSpinner = createSpinner('Posting PR comment...');
-    commentSpinner.start();
+    const commentSpinner = createSpinner('Posting PR comment...')
+    commentSpinner.start()
 
-    const prComment = generatePRComment(report);
-    const success = await postPRComment(repo, prNumber, prComment);
+    const prComment = generatePRComment(report)
+    const success = await postPRComment(repo, prNumber, prComment)
 
     if (success) {
-      commentSpinner.succeed('Posted accessibility report to PR');
+      commentSpinner.succeed('Posted accessibility report to PR')
     } else {
-      commentSpinner.fail('Failed to post PR comment');
+      commentSpinner.fail('Failed to post PR comment')
     }
   }
 
   // Print summary
-  console.log();
-  const scoreColor = report.summary.score >= 90 ? chalk.green
-    : report.summary.score >= 75 ? chalk.yellow
-    : chalk.red;
+  console.log()
+  const scoreColor =
+    report.summary.score >= 90 ? chalk.green : report.summary.score >= 75 ? chalk.yellow : chalk.red
 
   console.log(
     boxen(
       `${chalk.bold('Accessibility Check Complete')}\n\n` +
-      `Score: ${scoreColor(`${report.summary.score}/100`)}\n\n` +
-      `Critical: ${report.summary.bySeverity.critical || 0}\n` +
-      `Serious: ${report.summary.bySeverity.serious || 0}\n` +
-      `Moderate: ${report.summary.bySeverity.moderate || 0}\n` +
-      `Minor: ${report.summary.bySeverity.minor || 0}`,
+        `Score: ${scoreColor(`${report.summary.score}/100`)}\n\n` +
+        `Critical: ${report.summary.bySeverity.critical || 0}\n` +
+        `Serious: ${report.summary.bySeverity.serious || 0}\n` +
+        `Moderate: ${report.summary.bySeverity.moderate || 0}\n` +
+        `Minor: ${report.summary.bySeverity.minor || 0}`,
       {
         padding: 1,
         borderStyle: 'round',
         borderColor: report.summary.score >= 75 ? 'green' : 'yellow',
       }
     )
-  );
+  )
 
   // Check fail conditions
   if (failOn) {
-    const severities = failOn.split(',').map((s) => s.trim().toLowerCase()) as Severity[];
-    let shouldFail = false;
+    const severities = failOn.split(',').map((s) => s.trim().toLowerCase()) as Severity[]
+    let shouldFail = false
 
     for (const severity of severities) {
       if (report.summary.bySeverity[severity] && report.summary.bySeverity[severity] > 0) {
-        shouldFail = true;
-        break;
+        shouldFail = true
+        break
       }
     }
 
     if (shouldFail) {
-      console.log();
-      printError(`Failing due to ${failOn} violations`);
-      process.exit(1);
+      console.log()
+      printError(`Failing due to ${failOn} violations`)
+      process.exit(1)
     }
   }
 
-  console.log();
-  printSuccess('PR check complete!');
+  console.log()
+  printSuccess('PR check complete!')
 }
 
-export default prCheckCommand;
+export default prCheckCommand
