@@ -12,17 +12,25 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   accessibility:
     name: A11y Scan & Regression Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
     
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '18'
 
@@ -68,13 +76,18 @@ jobs:
       # Example 5: Post results as comment on PR
       - name: Comment on PR with Results
         if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ALLY_SCORE: ${{ steps.quick-scan.outputs.score }}
+          ALLY_VIOLATIONS: ${{ steps.quick-scan.outputs.violations }}
+          ALLY_IMPROVED: ${{ steps.regression-check.outputs.improved }}
+          ALLY_REGRESSED: ${{ steps.regression-check.outputs.regressed }}
         with:
           script: |
-            const score = '${{ steps.quick-scan.outputs.score }}';
-            const violations = '${{ steps.quick-scan.outputs.violations }}';
-            const improved = '${{ steps.regression-check.outputs.improved }}' || '0';
-            const regressed = '${{ steps.regression-check.outputs.regressed }}' || '0';
+            const score = process.env.ALLY_SCORE || '0';
+            const violations = process.env.ALLY_VIOLATIONS || '0';
+            const improved = process.env.ALLY_IMPROVED || '0';
+            const regressed = process.env.ALLY_REGRESSED || '0';
             
             let comment = `## ♿ Accessibility Report
             
@@ -101,7 +114,7 @@ jobs:
       # Upload report as artifact
       - name: Upload Accessibility Report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ally-report
           path: .ally/ACCESSIBILITY.md
@@ -118,9 +131,11 @@ jobs:
         chunk: [1, 2, 3, 4, 5]  # Scan in 5 parallel chunks
     
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '18'
 
