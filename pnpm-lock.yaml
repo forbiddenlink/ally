@@ -5,15 +5,15 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  basic-ftp: '>=6.0.1'
-  simple-git: '>=3.32.3'
+  basic-ftp: '>=6.0.1 <7'
+  simple-git: '>=3.32.3 <4'
   '@hono/node-server': '>=2.0.5 <3'
-  express-rate-limit: '>=8.2.2'
-  hono: '>=4.12.4'
-  minimatch: '>=10.2.3'
-  path-to-regexp: '>=8.4.0'
-  picomatch: '>=4.0.4'
-  rollup: '>=4.59.0'
+  express-rate-limit: '>=8.2.2 <9'
+  hono: '>=4.12.4 <5'
+  minimatch: '>=10.2.3 <11'
+  path-to-regexp: '>=8.4.0 <9'
+  picomatch: '>=4.0.4 <5'
+  rollup: '>=4.59.0 <5'
   brace-expansion@5: '>=5.0.8 <6'
   '@hono/node-server@2': '>=2.0.5 <3'
   brace-expansion: '>=1.1.18 <2'
@@ -72,7 +72,7 @@ importers:
         specifier: 25.9.0
         version: 25.9.0(yauzl@2.10.0)
       simple-git:
-        specifier: '>=3.32.3'
+        specifier: '>=3.32.3 <4'
         version: 3.36.0
     devDependencies:
       '@biomejs/biome':
@@ -917,7 +917,7 @@ packages:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
     engines: {node: '>=12.0.0'}
     peerDependencies:
-      picomatch: '>=4.0.4'
+      picomatch: '>=4.0.4 <5'
     peerDependenciesMeta:
       picomatch:
         optional: true
