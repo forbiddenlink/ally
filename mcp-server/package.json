@@ -20,5 +20,10 @@
   "devDependencies": {
     "@types/node": "^26.2.0",
     "typescript": "^7.0.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@hono/node-server": ">=1.19.15 <2"
+    }
   }
 }
