@@ -87,7 +87,7 @@
     "inquirer": "^14.1.0",
     "ora": "^9.4.1",
     "pa11y": "^9.1.1",
-    "puppeteer": "^25.9.0",
+    "puppeteer": "^25.10.0",
     "simple-git": "^3.36.0"
   },
   "devDependencies": {
@@ -124,7 +124,7 @@
       "fast-uri": ">=2.4.4 <3",
       "ip-address": ">=10.3.1 <11",
       "js-yaml": ">=4.3.1 <5",
-      "puppeteer": "25.9.0"
+      "puppeteer": "25.10.0"
     }
   },
   "packageManager": "pnpm@10.34.5"
