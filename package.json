@@ -1,6 +1,6 @@
 {
-  "name": "ally",
-  "version": "1.0.0",
+  "name": "ally-a11y",
+  "version": "1.0.1",
   "description": "Your codebase's accessibility ally. Scans, explains, and fixes a11y issues using GitHub Copilot CLI.",
   "type": "module",
   "bin": {
@@ -16,7 +16,7 @@
   "scripts": {
     "audit": "pnpm audit --audit-level high",
     "build": "tsc",
-    "build:all": "npm run build && cd mcp-server && npm run build",
+    "build:all": "pnpm run build && pnpm --filter ally-mcp-server build",
     "check": "pnpm biome:check && pnpm lint && pnpm test && pnpm build",
     "dev": "tsc -w",
     "start": "node dist/cli.js",
@@ -28,7 +28,7 @@
     "benchmark": "tsx benchmark/scan-speed.ts",
     "benchmark:ci": "tsx benchmark/scan-speed.ts --json --threshold 20",
     "security": "pnpm audit --audit-level high",
-    "prepublishOnly": "npm run build:all",
+    "prepublishOnly": "pnpm run build:all",
     "postinstall": "node -e \"console.log('\\n✅ ally-a11y installed! Run \\x1b[36mally init\\x1b[0m to get started.\\n')\"",
     "biome:check": "biome check .",
     "biome:fix": "biome check . --write",
@@ -62,7 +62,7 @@
     "mcp",
     "copilot-cli"
   ],
-  "author": "Liz Fong-Jones",
+  "author": "Elizabeth Stein <liz.stein@rocketpark.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -75,12 +75,11 @@
   "dependencies": {
     "@axe-core/puppeteer": "^4.13.0",
     "@clack/prompts": "^1.7.0",
-    "@oclif/core": "^4.14.0",
-    "@oclif/plugin-help": "^6.2.58",
     "@octokit/rest": "^22.0.1",
     "axe-core": "^4.13.0",
     "boxen": "^8.0.1",
     "chalk": "^6.0.0",
+    "chokidar": "^4.0.3",
     "cli-progress": "^3.12.0",
     "commander": "^15.0.0",
     "glob": "^13.0.6",
@@ -112,6 +111,7 @@
       "basic-ftp": ">=6.0.1 <7",
       "simple-git": ">=3.32.3 <4",
       "@hono/node-server": ">=2.0.5 <3",
+      "@hono/node-server@1": ">=1.19.15 <2",
       "express-rate-limit": ">=8.2.2 <9",
       "hono": ">=4.12.4 <5",
       "minimatch": ">=10.2.3 <11",

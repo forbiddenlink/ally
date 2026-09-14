@@ -1,6 +1,6 @@
 {
   "name": "ally-mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for ally - exposes project accessibility patterns to Copilot CLI",
   "type": "module",
   "main": "dist/index.js",
@@ -21,9 +21,5 @@
     "@types/node": "26.5.1",
     "typescript": "7.0.2"
   },
-  "pnpm": {
-    "overrides": {
-      "@hono/node-server": ">=1.19.15 <2"
-    }
-  }
+  "private": true
 }

@@ -3,12 +3,12 @@
  */
 
 import chalk from 'chalk'
-import { execSync } from 'child_process'
 import { existsSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { resolve } from 'path'
 import type { AllyReport, Severity, Violation } from '../types/index.js'
 import { checkCopilotCli } from '../utils/copilot.js'
+import { runCommandSync, splitCommand } from '../utils/exec.js'
 import { suggestInit, suggestRescan } from '../utils/errors.js'
 import { createSpinner, printBanner, printError, printInfo, printWarning } from '../utils/ui.js'
 
@@ -136,20 +136,20 @@ Please explain:
 Keep the explanation concise and actionable.`
 
     try {
-      // Execute Copilot CLI synchronously
-      const cmdParts = command.split(' ')
-      const fullCommand =
-        cmdParts.length > 1
-          ? `${command} explain "${prompt.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`
-          : `${command} -p "${prompt.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`
+      const { file, args: prefix } = splitCommand(command)
+      const copilotArgs =
+        prefix.length > 0 ? [...prefix, 'explain', prompt] : ['-p', prompt]
 
-      const result = execSync(fullCommand, {
-        encoding: 'utf-8',
+      const result = runCommandSync(file, copilotArgs, {
         timeout: 30000,
         stdio: ['pipe', 'pipe', 'pipe'],
       })
 
-      console.log(chalk.white(result.trim()))
+      if (result.status !== 0) {
+        throw new Error(result.stderr.trim() || 'Copilot CLI exited with an error')
+      }
+
+      console.log(chalk.white(result.stdout.trim()))
     } catch (error) {
       // Fallback to built-in explanation if Copilot fails
       const explanation = getPlainLanguageExplanation(violation)

@@ -4,11 +4,11 @@
 
 import boxen from 'boxen'
 import chalk from 'chalk'
-import { execSync } from 'child_process'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { resolve } from 'path'
 import type { AllyReport, Severity } from '../types/index.js'
+import { runCommandSync } from '../utils/exec.js'
 import { suggestInit } from '../utils/errors.js'
 import {
   createSpinner,
@@ -32,30 +32,35 @@ interface GitHubRepo {
   repo: string
 }
 
+const GITHUB_NAME = /^[A-Za-z0-9._-]+$/
+
+/**
+ * Parse owner/repo from a git remote URL. Exported for tests.
+ */
+export function parseGitHubRemote(remote: string): GitHubRepo | null {
+  const httpsMatch = remote.match(/github\.com\/([^/]+)\/([^/.]+)/)
+  const sshMatch = remote.match(/github\.com:([^/]+)\/([^/.]+)/)
+  const match = httpsMatch || sshMatch
+  if (!match) return null
+
+  const owner = match[1]
+  const repo = match[2].replace(/\.git$/, '')
+  if (!GITHUB_NAME.test(owner) || !GITHUB_NAME.test(repo)) return null
+
+  return { owner, repo }
+}
+
 /**
  * Get current GitHub repo from git remote
  */
 function getGitHubRepo(): GitHubRepo | null {
   try {
-    const remote = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim()
-
-    // Parse GitHub URL (supports both HTTPS and SSH)
-    // https://github.com/owner/repo.git
-    // git@github.com:owner/repo.git
-    const httpsMatch = remote.match(/github\.com\/([^/]+)\/([^/.]+)/)
-    const sshMatch = remote.match(/github\.com:([^/]+)\/([^/.]+)/)
-
-    const match = httpsMatch || sshMatch
-    if (match) {
-      return {
-        owner: match[1],
-        repo: match[2].replace(/\.git$/, ''),
-      }
-    }
+    const result = runCommandSync('git', ['remote', 'get-url', 'origin'])
+    if (result.status !== 0) return null
+    return parseGitHubRemote(result.stdout.trim())
   } catch {
-    // Not in a git repo or no remote
+    return null
   }
-  return null
 }
 
 /**
@@ -67,7 +72,7 @@ function getCurrentPR(): number | null {
     const eventPath = process.env.GITHUB_EVENT_PATH
     if (eventPath && existsSync(eventPath)) {
       try {
-        const event = JSON.parse(require('fs').readFileSync(eventPath, 'utf-8'))
+        const event = JSON.parse(readFileSync(eventPath, 'utf-8'))
         return event.pull_request?.number || null
       } catch {
         // Ignore
@@ -174,11 +179,14 @@ async function postPRComment(
     const tempFile = resolve('.ally/pr-comment.md')
     await writeFile(tempFile, comment)
 
-    // Use gh CLI to post comment
-    execSync(
-      `gh pr comment ${prNumber} --repo ${repo.owner}/${repo.repo} --body-file "${tempFile}"`,
-      { encoding: 'utf-8', stdio: 'pipe' }
+    const result = runCommandSync(
+      'gh',
+      ['pr', 'comment', String(prNumber), '--repo', `${repo.owner}/${repo.repo}`, '--body-file', tempFile],
+      { stdio: 'pipe' }
     )
+    if (result.status !== 0) {
+      throw new Error(result.stderr.trim() || result.stdout.trim() || 'gh pr comment failed')
+    }
 
     return true
   } catch (error) {

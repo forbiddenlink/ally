@@ -10,15 +10,17 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { APCAcontrast, sRGBtoY } from 'apca-w3'
+import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { existsSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
-import { extname, join } from 'path'
+import { dirname, extname, join } from 'path'
 import { z } from 'zod'
 
 // Create server instance
 const server = new McpServer({
   name: 'ally-patterns',
-  version: '1.0.0',
+  version: '1.0.1',
 })
 
 // Telemetry to track tool usage
@@ -2162,6 +2164,144 @@ function estimateContrastRatio(color: string): number {
 
   return Math.round(ratio * 10) / 10
 }
+
+function resolveAllyCli(): string {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const candidates = [
+    join(here, '../../dist/cli.js'),
+    join(process.cwd(), 'dist/cli.js'),
+    join(process.cwd(), 'node_modules/ally-a11y/dist/cli.js'),
+    join(process.cwd(), 'node_modules/ally/dist/cli.js'),
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+  throw new Error(
+    'ally CLI not found. From this repo run `pnpm run build`, or install ally-a11y in the project.'
+  )
+}
+
+function runAlly(args: string[], timeoutMs = 120_000): Promise<{ stdout: string; stderr: string; status: number | null }> {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(process.execPath, [resolveAllyCli(), ...args], {
+      cwd: process.cwd(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+    })
+
+    let stdout = ''
+    let stderr = ''
+    let settled = false
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM')
+      if (!settled) {
+        settled = true
+        reject(new Error(`ally timed out after ${timeoutMs}ms`))
+      }
+    }, timeoutMs)
+
+    child.stdout?.on('data', (chunk: Buffer | string) => {
+      stdout += chunk.toString()
+    })
+    child.stderr?.on('data', (chunk: Buffer | string) => {
+      stderr += chunk.toString()
+    })
+    child.on('error', (error) => {
+      clearTimeout(timer)
+      if (!settled) {
+        settled = true
+        reject(error)
+      }
+    })
+    child.on('close', (status) => {
+      clearTimeout(timer)
+      if (!settled) {
+        settled = true
+        resolvePromise({ stdout, stderr, status })
+      }
+    })
+  })
+}
+
+server.tool(
+  'scan_accessibility',
+  'Run an accessibility scan with ally (axe-core). Use this instead of guessing WCAG issues. Pass a local path or a running URL.',
+  {
+    path: z.string().optional().describe('Directory or file to scan (default: current directory)'),
+    url: z.string().optional().describe('Running page URL to scan instead of files'),
+    standard: z.string().optional().describe('WCAG standard tag such as wcag22aa'),
+  },
+  async ({ path: targetPath, url, standard }) => {
+    telemetry.log('scan_accessibility')
+    try {
+      const args = ['scan', '--json', '--ci']
+      if (url) {
+        args.push('--url', url)
+      } else if (targetPath) {
+        args.push(targetPath)
+      } else {
+        args.push('.')
+      }
+      if (standard) {
+        args.push('--standard', standard)
+      }
+
+      const result = await runAlly(args)
+      const output = result.stdout.trim() || result.stderr.trim() || 'Scan finished with no output.'
+      return {
+        content: [{ type: 'text' as const, text: output }],
+        isError: result.status !== 0 && result.status !== 1,
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: error instanceof Error ? error.message : String(error),
+          },
+        ],
+        isError: true,
+      }
+    }
+  }
+)
+
+server.tool(
+  'fix_accessibility',
+  'Apply ally high-confidence accessibility fixes from the latest scan. Prefer dryRun first.',
+  {
+    dryRun: z.boolean().optional().describe('Preview fixes without writing files (default true)'),
+    auto: z.boolean().optional().describe('Apply fixes without prompting (ignored when dryRun is true)'),
+  },
+  async ({ dryRun = true, auto = false }) => {
+    telemetry.log('fix_accessibility')
+    try {
+      const args = ['fix']
+      if (dryRun) {
+        args.push('--dry-run')
+      } else if (auto) {
+        args.push('--auto')
+      }
+
+      const result = await runAlly(args)
+      const output = result.stdout.trim() || result.stderr.trim() || 'Fix finished with no output.'
+      return {
+        content: [{ type: 'text' as const, text: output }],
+        isError: result.status !== 0,
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: error instanceof Error ? error.message : String(error),
+          },
+        ],
+        isError: true,
+      }
+    }
+  }
+)
 
 // Run the server
 async function main() {

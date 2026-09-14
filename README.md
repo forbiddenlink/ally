@@ -404,8 +404,8 @@ ally watch ./src --fix-on-save --verbose # Show all fixes applied
 - Only fixes with **\u226590% confidence** (safe defaults)
 - Shows **diff** of each auto-fix in terminal
 - Tracks **stats** (files changed, fixes applied)
-- **Rescans** file after applying fixes
-- Works with **all file types** (HTML, JSX, Vue, Svelte, etc.)
+- **Rescans** HTML after applying fixes
+- Watches **HTML, HTM, TSX, JSX, Vue, and Svelte**. HTML files get a full axe scan. Component files get high-confidence source fixes (axe needs rendered HTML — use `ally scan --url` for that).
 
 **Why It's Unique:**
 - \ud83d\udd25 **Zero friction** \u2014 Just save files normally
@@ -937,7 +937,7 @@ For security issues, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT © Liz Fong-Jones
+MIT © Elizabeth Stein
 
 ## Acknowledgments
 

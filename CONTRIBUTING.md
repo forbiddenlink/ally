@@ -21,7 +21,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 ### Prerequisites
 
 - Node.js 18+ (18.x, 20.x, or 22.x)
-- npm 8+
+- pnpm (see `packageManager` in package.json)
 - Git
 
 ### Fork and Clone
@@ -44,17 +44,16 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ```bash
 # Install dependencies
-npm install
-cd mcp-server && npm install && cd ..
+pnpm install
 
 # Build the project
-npm run build:all
+pnpm run build:all
 
 # Run tests
-npm test
+pnpm test
 
 # Run type checking
-npm run lint
+pnpm run lint
 
 # Test CLI locally
 node dist/cli.js --help
@@ -97,8 +96,8 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 4. Ensure all tests pass:
 
    ```bash
-   npm test
-   npm run lint
+   pnpm test
+   pnpm run lint
    ```
 
 5. Commit your changes with clear messages:
@@ -172,13 +171,13 @@ mcp-server/           # MCP server implementation
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run tests for a specific file
 node --test --import tsx test/scanner.test.ts
 
 # Run tests with verbose output
-NODE_OPTIONS='--test-reporter=spec' npm test
+NODE_OPTIONS='--test-reporter=spec' pnpm test
 ```
 
 ### Writing Tests
@@ -240,18 +239,18 @@ We aim for:
 
 ```bash
 # Build
-npm run build          # Build main CLI
-npm run build:all      # Build CLI + MCP server
+pnpm run build          # Build main CLI
+pnpm run build:all      # Build CLI + MCP server
 
 # Development
-npm run dev            # Watch mode - rebuild on changes
+pnpm run dev            # Watch mode - rebuild on changes
 
 # Testing
-npm test               # Run all tests
-npm run test:coverage  # Run tests with coverage
+pnpm test               # Run all tests
+pnpm run test:coverage  # Run tests with coverage
 
 # Linting
-npm run lint           # Type check with TypeScript
+pnpm run lint           # Type check with TypeScript
 
 # Release (maintainers only)
 npm version patch      # Bump version

@@ -3,10 +3,11 @@
  */
 
 import chalk from 'chalk'
-import { execSync, spawn } from 'child_process'
+import { spawn } from 'child_process'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
 import { resolve } from 'path'
+import { runCommandSync } from './exec.js'
 
 export interface CopilotConfig {
   available: boolean
@@ -18,18 +19,20 @@ export interface CopilotConfig {
  * Check if GitHub Copilot CLI is installed and available
  */
 export function checkCopilotCli(): CopilotConfig {
-  const commands = ['copilot', 'gh copilot']
+  const commands: Array<{ file: string; args: string[]; label: string }> = [
+    { file: 'copilot', args: ['--version'], label: 'copilot' },
+    { file: 'gh', args: ['copilot', '--version'], label: 'gh copilot' },
+  ]
 
   for (const cmd of commands) {
     try {
-      const result = execSync(`${cmd} --version 2>/dev/null`, {
-        encoding: 'utf-8',
-        timeout: 5000,
-      })
-      return {
-        available: true,
-        command: cmd,
-        version: result.trim(),
+      const result = runCommandSync(cmd.file, cmd.args, { timeout: 5000 })
+      if (result.status === 0) {
+        return {
+          available: true,
+          command: cmd.label,
+          version: result.stdout.trim() || result.stderr.trim(),
+        }
       }
     } catch {
       // Command not found, try next
@@ -109,6 +112,7 @@ export async function invokeCopilotFix(
 
     const copilot = spawn(cmd, cmdArgs, {
       stdio: ['inherit', 'pipe', 'pipe'],
+      shell: false,
     })
 
     let stdout = ''
@@ -163,8 +167,9 @@ export function printCopilotInstructions(): void {
 export function checkMcpConfig(): { configured: boolean; path: string } {
   const home = homedir()
   const configPaths = [
+    '.cursor/mcp.json',
     '.copilot/mcp-config.json',
-    ...(home ? [resolve(home, '.copilot/mcp-config.json')] : []),
+    ...(home ? [resolve(home, '.cursor/mcp.json'), resolve(home, '.copilot/mcp-config.json')] : []),
   ]
 
   for (const configPath of configPaths) {

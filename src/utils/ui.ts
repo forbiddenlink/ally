@@ -100,7 +100,7 @@ export function printBanner(): void {
   / _\` | | || | | |
  | (_| | | || |_| |
   \\__,_| |_| \\__, |
-             |___/  v1.0.0
+             |___/  v1.0.1
 `)
   console.log(banner)
   console.log(chalk.dim("  Your codebase's accessibility ally\n"))

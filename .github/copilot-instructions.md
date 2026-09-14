@@ -48,11 +48,13 @@ The ally MCP server (`mcp-server/src/index.ts`) provides context:
 
 | Tool | Purpose |
 |------|---------|
+| `scan_accessibility` | Run an axe-core scan |
+| `fix_accessibility` | Preview or apply high-confidence fixes |
 | `get_component_patterns` | Analyze existing ARIA patterns |
 | `get_design_tokens` | Extract colors for contrast checks |
 | `get_fix_history` | Previous fixes for consistency |
 | `get_scan_summary` | Current accessibility state |
-| `get_wcag_guideline` | Full WCAG criterion details |
+| `get_wcag_guideline` | Full WCAG success criterion details |
 | `suggest_aria_pattern` | ARIA patterns by component type |
 | `check_color_contrast` | Calculate WCAG contrast ratios |
 

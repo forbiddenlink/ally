@@ -82,14 +82,16 @@ Calculates 0-100 impact scores for violations based on:
 
 ### MCP Server (`mcp-server/src/index.ts`)
 
-Exposes 7 tools for GitHub Copilot CLI integration:
-1. `get_component_patterns` - Analyze ARIA patterns in codebase
-2. `get_design_tokens` - Extract colors with contrast checking
-3. `get_fix_history` - Previous fixes for consistency
-4. `get_scan_summary` - Current scan state
-5. `get_wcag_guideline` - Full WCAG criterion details
-6. `suggest_aria_pattern` - ARIA patterns for components
-7. `check_color_contrast` - Calculate contrast ratios
+Exposes tools for Copilot and Cursor:
+1. `scan_accessibility` - Run an axe-core scan
+2. `fix_accessibility` - Preview or apply high-confidence fixes
+3. `get_component_patterns` - Analyze ARIA patterns in codebase
+4. `get_design_tokens` - Extract colors with contrast checking
+5. `get_fix_history` - Previous fixes for consistency
+6. `get_scan_summary` - Current scan state
+7. `get_wcag_guideline` - Full WCAG success criterion details
+8. `suggest_aria_pattern` - ARIA patterns for components
+9. `check_color_contrast` - Calculate contrast ratios
 
 ## Data Flow
 
@@ -223,8 +225,8 @@ Key optimizations:
 
 1. Fork the repository
 2. Create a feature branch
-3. Run tests: `npm test`
-4. Run linting: `npm run lint`
+3. Run tests: `pnpm test`
+4. Run linting: `pnpm run lint`
 5. Submit a pull request
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.

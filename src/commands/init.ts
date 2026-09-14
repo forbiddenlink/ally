@@ -4,8 +4,8 @@
 
 import chalk from 'chalk'
 import { existsSync } from 'fs'
-import { mkdir, writeFile } from 'fs/promises'
-import { join, resolve } from 'path'
+import { appendFile, mkdir, readFile, writeFile } from 'fs/promises'
+import { join } from 'path'
 import { createSpinner, printBanner, printInfo, printSuccess, printWarning } from '../utils/ui.js'
 
 interface InitOptions {
@@ -27,7 +27,7 @@ async function setupPreCommitHooks(
   // Pre-commit hook script content
   const preCommitScript = `#!/bin/sh
 # Accessibility check - block commits with a11y errors
-npx ally-a11y scan src/ --ci --fail-on error
+npx ally-a11y scan src/ --ci --fail-on critical
 `
 
   // Pre-commit config YAML content
@@ -36,7 +36,7 @@ npx ally-a11y scan src/ --ci --fail-on error
     hooks:
       - id: ally-scan
         name: Accessibility Check
-        entry: npx ally-a11y scan src/ --ci --fail-on error
+        entry: npx ally-a11y scan src/ --ci --fail-on critical
         language: system
         types: [html]
         pass_filenames: false
@@ -85,6 +85,45 @@ npx ally-a11y scan src/ --ci --fail-on error
   }
 }
 
+async function writeCursorMcpConfig(cwd: string, force: boolean): Promise<void> {
+  const cursorDir = join(cwd, '.cursor')
+  const cursorMcpPath = join(cursorDir, 'mcp.json')
+  const allyServer = {
+    command: 'node',
+    args: ['./node_modules/ally-a11y/mcp-server/dist/index.js'],
+  }
+
+  if (!existsSync(cursorDir)) {
+    await mkdir(cursorDir, { recursive: true })
+  }
+
+  if (existsSync(cursorMcpPath) && !force) {
+    try {
+      const existing = JSON.parse(await readFile(cursorMcpPath, 'utf-8')) as {
+        mcpServers?: Record<string, unknown>
+      }
+      if (!existing.mcpServers) existing.mcpServers = {}
+      if (!existing.mcpServers.ally && !existing.mcpServers['ally-patterns']) {
+        existing.mcpServers.ally = allyServer
+        await writeFile(cursorMcpPath, JSON.stringify(existing, null, 2) + '\n')
+        printSuccess('Added ally to .cursor/mcp.json')
+        return
+      }
+    } catch {
+      printWarning('.cursor/mcp.json exists but could not be merged (use --force to overwrite)')
+      return
+    }
+    printInfo('.cursor/mcp.json already includes ally')
+    return
+  }
+
+  await writeFile(
+    cursorMcpPath,
+    JSON.stringify({ mcpServers: { ally: allyServer } }, null, 2) + '\n'
+  )
+  printSuccess('Created .cursor/mcp.json')
+}
+
 export async function initCommand(options: InitOptions = {}): Promise<void> {
   printBanner()
 
@@ -130,6 +169,8 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
     printWarning('.copilot/mcp-config.json already exists (use --force to overwrite)')
   }
 
+  await writeCursorMcpConfig(cwd, force)
+
   // Set up pre-commit hooks if requested
   if (hooks) {
     await setupPreCommitHooks(cwd, force, createdFiles)
@@ -138,7 +179,6 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
   // Add to .gitignore if it exists
   const gitignorePath = join(cwd, '.gitignore')
   if (existsSync(gitignorePath)) {
-    const { readFile } = await import('fs/promises')
     const gitignore = await readFile(gitignorePath, 'utf-8')
 
     const toAdd: string[] = []
@@ -148,7 +188,6 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
 
     if (toAdd.length > 0) {
       const appendContent = '\n# Ally accessibility scanner\n' + toAdd.join('\n') + '\n'
-      const { appendFile } = await import('fs/promises')
       await appendFile(gitignorePath, appendContent)
       printSuccess('Updated .gitignore')
     }
@@ -181,6 +220,7 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
     printInfo('Commits will now be checked for accessibility violations')
   }
 
+  printInfo('Cursor agents can use the ally MCP server and the ally-a11y skill.')
   printInfo('For AI-powered fixes, install GitHub Copilot CLI:')
   console.log(chalk.dim('  npm install -g @github/copilot-cli'))
   console.log(chalk.dim('  copilot auth login'))

@@ -35,9 +35,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install MCP server dependencies
-        run: cd mcp-server && npm ci
-
       - name: Type check
         run: npx tsc --noEmit
 
@@ -114,9 +111,7 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies
-        run: |
-          pnpm install --frozen-lockfile
-          cd mcp-server && npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm run build:all

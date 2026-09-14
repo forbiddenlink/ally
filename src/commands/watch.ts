@@ -1,18 +1,21 @@
 /**
  * ally watch command - Continuous accessibility testing for development
  *
- * Watches a directory for HTML file changes and automatically scans
- * them for accessibility violations.
+ * Watches HTML and component files. HTML files get a full axe scan.
+ * Component files get high-confidence source fixes (axe needs rendered HTML).
  */
 
 import chalk from 'chalk'
-import { existsSync, statSync, watch } from 'fs'
-import { readdir, readFile, writeFile } from 'fs/promises'
-import { extname, relative, resolve } from 'path'
+import chokidar from 'chokidar'
+import { existsSync, statSync } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
+import { relative, resolve } from 'path'
 import type { ScanResult, Severity, Violation } from '../types/index.js'
-import { FIX_CONFIDENCE, generateSuggestedFix, getFixConfidence } from '../utils/fix-patterns.js'
+import { generateSuggestedFix, getFixConfidence } from '../utils/fix-patterns.js'
 import { AccessibilityScanner, calculateScore } from '../utils/scanner.js'
-import { printBanner, printError, printInfo, printSuccess, printWarning } from '../utils/ui.js'
+import { applyHighConfidenceSourceFixes } from '../utils/source-fixes.js'
+import { printBanner, printError, printInfo } from '../utils/ui.js'
+import { isHtmlFile, isWatchableFile } from '../utils/watch-files.js'
 
 interface WatchCommandOptions {
   port?: number
@@ -28,17 +31,13 @@ interface WatchStats {
   autoFixed: number
 }
 
-const SUPPORTED_EXTENSIONS = ['.html', '.htm']
-
 /**
- * Auto-apply high-confidence fixes to a file
- * Returns the number of fixes applied
+ * Auto-apply high-confidence fixes to a file from axe violations
  */
 async function autoFixFile(filePath: string, violations: Violation[]): Promise<number> {
   let content = await readFile(filePath, 'utf-8')
   let fixesApplied = 0
 
-  // Only apply high-confidence fixes (>= 0.9)
   const highConfidenceViolations = violations.filter((v) => {
     const confidence = getFixConfidence(v.id)
     return confidence !== null && confidence >= 0.9
@@ -49,7 +48,6 @@ async function autoFixFile(filePath: string, violations: Violation[]): Promise<n
       if (node.html) {
         const fixedHtml = generateSuggestedFix(violation, node.html)
         if (fixedHtml && fixedHtml !== node.html) {
-          // Apply the fix by replacing the HTML
           content = content.replace(node.html, fixedHtml)
           fixesApplied++
         }
@@ -64,9 +62,6 @@ async function autoFixFile(filePath: string, violations: Violation[]): Promise<n
   return fixesApplied
 }
 
-/**
- * Format time for log output
- */
 function formatTime(): string {
   const now = new Date()
   return chalk.dim(
@@ -77,13 +72,7 @@ function formatTime(): string {
   )
 }
 
-/**
- * Debounce function to prevent rapid-fire scans
- */
-function debounce(
-  fn: (filePath: string) => Promise<void>,
-  delay: number
-): (filePath: string) => void {
+function debounce(fn: (filePath: string) => Promise<void>, delay: number): (filePath: string) => void {
   let timeoutId: ReturnType<typeof setTimeout> | null = null
   return (filePath: string) => {
     if (timeoutId) {
@@ -93,32 +82,12 @@ function debounce(
   }
 }
 
-/**
- * Get severity icon
- */
-function getSeverityIcon(severity: Severity): string {
-  const icons: Record<Severity, string> = {
-    critical: chalk.red('!!!'),
-    serious: chalk.red('!!'),
-    moderate: chalk.yellow('!'),
-    minor: chalk.blue('i'),
-  }
-  return icons[severity]
-}
-
-/**
- * Print compact violation for watch mode
- */
 function printCompactViolation(violation: Violation): void {
-  const icon = getSeverityIcon(violation.impact)
   const count = violation.nodes.length
   const countText = count > 1 ? chalk.dim(` (${count} instances)`) : ''
   console.log(`   - ${chalk.cyan(violation.id)}: ${violation.help}${countText}`)
 }
 
-/**
- * Print file scan result in watch mode format
- */
 function printWatchResult(
   file: string,
   result: ScanResult,
@@ -147,7 +116,6 @@ function printWatchResult(
         ` (score: ${scoreColor(score.toString())})`
     )
 
-    // Group by severity for compact output
     const bySeverity: Partial<Record<Severity, Violation[]>> = {}
     for (const v of violations) {
       if (!bySeverity[v.impact]) {
@@ -156,7 +124,6 @@ function printWatchResult(
       bySeverity[v.impact]!.push(v)
     }
 
-    // Print critical and serious first
     const order: Severity[] = ['critical', 'serious', 'moderate', 'minor']
     for (const severity of order) {
       const sViolations = bySeverity[severity]
@@ -169,9 +136,6 @@ function printWatchResult(
   }
 }
 
-/**
- * Print watch summary on exit
- */
 function printWatchSummary(stats: WatchStats, startTime: Date): void {
   const duration = Math.round((Date.now() - startTime.getTime()) / 1000)
   const minutes = Math.floor(duration / 60)
@@ -191,81 +155,30 @@ function printWatchSummary(stats: WatchStats, startTime: Date): void {
   console.log()
 }
 
-/**
- * Recursively watch a directory
- */
-async function watchDirectory(
-  dirPath: string,
-  callback: (filename: string) => void
-): Promise<() => void> {
-  const watchers: ReturnType<typeof watch>[] = []
-  const watchedDirs = new Set<string>()
+function watchDirectory(dirPath: string, callback: (filename: string) => void): () => void {
+  const watcher = chokidar.watch(dirPath, {
+    ignored: (watchPath: string) => {
+      const normalized = watchPath.replace(/\\/g, '/')
+      return /(^|\/)(\.|node_modules|dist|build)(\/|$)/.test(normalized)
+    },
+    ignoreInitial: true,
+    awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
+  })
 
-  async function addWatcher(dir: string): Promise<void> {
-    if (watchedDirs.has(dir)) return
-    watchedDirs.add(dir)
-
-    try {
-      const watcher = watch(dir, { recursive: false }, (eventType, filename) => {
-        if (filename && isHtmlFile(filename)) {
-          const fullPath = resolve(dir, filename)
-          callback(fullPath)
-        }
-      })
-      watchers.push(watcher)
-
-      // Watch subdirectories
-      const entries = await readdir(dir, { withFileTypes: true })
-      for (const entry of entries) {
-        if (
-          entry.isDirectory() &&
-          !entry.name.startsWith('.') &&
-          entry.name !== 'node_modules' &&
-          entry.name !== 'dist' &&
-          entry.name !== 'build'
-        ) {
-          await addWatcher(resolve(dir, entry.name))
-        }
-      }
-    } catch (error) {
-      // Directory might not exist or be inaccessible
+  const onFile = (filePath: string) => {
+    if (isWatchableFile(filePath)) {
+      callback(filePath)
     }
   }
 
-  // Use recursive watching on supported platforms
-  try {
-    const watcher = watch(dirPath, { recursive: true }, (eventType, filename) => {
-      if (filename && isHtmlFile(filename)) {
-        const fullPath = resolve(dirPath, filename)
-        if (existsSync(fullPath)) {
-          callback(fullPath)
-        }
-      }
-    })
-    watchers.push(watcher)
-  } catch (error) {
-    // Fall back to manual recursive watching
-    await addWatcher(dirPath)
-  }
+  watcher.on('add', onFile)
+  watcher.on('change', onFile)
 
   return () => {
-    for (const watcher of watchers) {
-      watcher.close()
-    }
+    void watcher.close()
   }
 }
 
-/**
- * Check if file is an HTML file
- */
-function isHtmlFile(filename: string): boolean {
-  const ext = extname(filename).toLowerCase()
-  return SUPPORTED_EXTENSIONS.includes(ext)
-}
-
-/**
- * Main watch command
- */
 export async function watchCommand(
   targetPath: string = '.',
   options: WatchCommandOptions = {}
@@ -274,7 +187,6 @@ export async function watchCommand(
 
   const absolutePath = resolve(targetPath)
 
-  // Verify path exists
   if (!existsSync(absolutePath)) {
     printError(`Path does not exist: ${absolutePath}`)
     process.exit(1)
@@ -290,17 +202,16 @@ export async function watchCommand(
 
   console.log(chalk.cyan.bold('Watching for accessibility changes...'))
   console.log(chalk.dim(`   Directory: ${absolutePath}`))
+  console.log(chalk.dim('   Files: .html, .htm, .tsx, .jsx, .vue, .svelte'))
   console.log(chalk.dim(`   Debounce: ${debounceMs}ms`))
   if (fixOnSave) {
     console.log(chalk.green('   Auto-fix: ON (confidence ≥ 90%)'))
   }
   console.log(chalk.dim('   Press Ctrl+C to stop\n'))
 
-  // Initialize scanner
   const scanner = new AccessibilityScanner()
   await scanner.init()
 
-  // Track stats
   const stats: WatchStats = {
     filesScanned: 0,
     totalViolations: 0,
@@ -309,7 +220,6 @@ export async function watchCommand(
   }
   const startTime = new Date()
 
-  // Scan a file
   const scanFile = async (filePath: string): Promise<void> => {
     if (!existsSync(filePath)) return
 
@@ -320,6 +230,34 @@ export async function watchCommand(
         console.log(chalk.dim('   Press Ctrl+C to stop\n'))
       }
 
+      if (!isHtmlFile(filePath)) {
+        stats.filesScanned++
+        let fixesApplied = 0
+        if (fixOnSave) {
+          const original = await readFile(filePath, 'utf-8')
+          const { content, applied } = applyHighConfidenceSourceFixes(original)
+          if (applied.length > 0 && content !== original) {
+            await writeFile(filePath, content, 'utf-8')
+            fixesApplied = applied.length
+            stats.autoFixed += fixesApplied
+          }
+        }
+
+        const relPath = relative(absolutePath, filePath)
+        console.log()
+        console.log(`${formatTime()} ${chalk.bold(relPath)} changed`)
+        if (fixesApplied > 0) {
+          const fixText = fixesApplied === 1 ? 'fix' : 'fixes'
+          console.log(chalk.green(`   ✓ Auto-applied ${fixesApplied} source ${fixText}`))
+        } else if (fixOnSave) {
+          console.log(chalk.dim('   No high-confidence source fixes to apply'))
+        }
+        console.log(
+          chalk.dim('   Component files are not axe-scanned (needs rendered HTML). Use ally scan --url.')
+        )
+        return
+      }
+
       const result = await scanner.scanHtmlFile(filePath)
       stats.filesScanned++
       stats.totalViolations += result.violations.length
@@ -327,13 +265,11 @@ export async function watchCommand(
         stats.cleanScans++
       }
 
-      // Auto-fix if enabled
       let fixesApplied = 0
       if (fixOnSave && result.violations.length > 0) {
         fixesApplied = await autoFixFile(filePath, result.violations)
         stats.autoFixed += fixesApplied
 
-        // Rescan after fixes to show updated violations
         if (fixesApplied > 0) {
           const updatedResult = await scanner.scanHtmlFile(filePath)
           printWatchResult(filePath, updatedResult, absolutePath, fixesApplied)
@@ -351,15 +287,12 @@ export async function watchCommand(
     }
   }
 
-  // Debounced scan
   const debouncedScan = debounce(scanFile, debounceMs)
 
-  // Set up file watching
-  const stopWatching = await watchDirectory(absolutePath, (filename) => {
+  const stopWatching = watchDirectory(absolutePath, (filename) => {
     debouncedScan(filename)
   })
 
-  // Handle graceful shutdown
   const cleanup = async (): Promise<void> => {
     stopWatching()
     await scanner.close()
@@ -370,10 +303,8 @@ export async function watchCommand(
   process.on('SIGINT', cleanup)
   process.on('SIGTERM', cleanup)
 
-  // Initial message about watching
   printInfo('Waiting for file changes...')
 
-  // Keep the process running
   await new Promise(() => {})
 }
 
