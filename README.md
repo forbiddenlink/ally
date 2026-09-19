@@ -92,7 +92,7 @@ ally scan-storybook      # Scan Storybook components
 ally tree <url>          # View accessibility tree
 
 # Fixing & Learning
-ally fix                 # Interactive fix approval (35+ patterns)
+ally fix                 # Interactive fix approval (34 patterns)
 ally explain             # WCAG explanations + Copilot integration
 ally learn <violation>   # Educational deep-dive on violations
 ally triage              # Prioritize violations interactively
@@ -332,7 +332,7 @@ ally explain -l 5            # Limit to 5 issues
 
 ### `ally fix`
 
-Applies accessibility fixes using 35+ pattern-based transformations. Optionally integrates with GitHub Copilot CLI for complex fixes.
+Applies accessibility fixes using 34 pattern-based transformations. Optionally integrates with GitHub Copilot CLI for complex fixes.
 
 ```bash
 ally fix                     # Interactive (approve each fix)
@@ -343,7 +343,7 @@ ally fix -s serious          # Only fix serious+ issues
 
 **Features:**
 
-- 35+ automated fix patterns (image-alt, button-name, ARIA, etc.)
+- 34 automated fix patterns (image-alt, button-name, ARIA, etc.)
 - Shows diff before applying
 - Approve/reject each change
 - Tracks fix history for consistency
@@ -400,7 +400,7 @@ ally watch ./src --fix-on-save --verbose # Show all fixes applied
 ```
 
 **`--fix-on-save` Options:**
-- Applies **35+ fix patterns** automatically
+- Applies **34 fix patterns** automatically
 - Only fixes with **\u226590% confidence** (safe defaults)
 - Shows **diff** of each auto-fix in terminal
 - Tracks **stats** (files changed, fixes applied)
@@ -665,7 +665,7 @@ Ally includes a custom MCP server that provides project-specific context to Copi
 | **Business Context** | ✅ | ❌ | ❌ | ❌ |
 | **User Impact %** | ✅ | ❌ | ❌ | ❌ |
 | Scan | ✅ | ✅ | ✅ | ✅ |
-| AI Fixes (35+ patterns) | ✅ | ❌ | ❌ | ❌ |
+| AI Fixes (34 patterns) | ✅ | ❌ | ❌ | ❌ |
 | MCP Integration | ✅ | ❌ | ❌ | ❌ |
 | Watch Mode | ✅ | ❌ | ❌ | ❌ |
 | SARIF/JUnit/CSV Output | ✅ | ❌ | ✅ | ❌ |

@@ -43,7 +43,7 @@ via `pnpm --filter ally-mcp-server build` or `pnpm run build:all`.
   `crawl.ts`, `scan-storybook.ts`, `tree.ts`, `explain.ts`, `learn.ts`, `triage.ts`,
   `report.ts`, `history.ts`, `stats.ts`, `badge.ts`, `pr-check.ts`, `audit-palette.ts`,
   `init.ts`, `doctor.ts`, `health.ts`, `completion.ts`
-- `src/utils/` - `scanner.ts`, `fix-patterns.ts` (35+ auto-fix patterns), `browser.ts`,
+- `src/utils/` - `scanner.ts`, `fix-patterns.ts` (34 auto-fix patterns), `browser.ts`,
   `impact-scores.ts`, `vpat-mappings.ts`/`vpat-template.ts`, `history.ts`/
   `history-tracking.ts`, `baseline.ts`, `config.ts`, `exec.ts`, `ai-alt-text.ts`, `copilot.ts`
 - `mcp-server/src/index.ts` - MCP server exposing project a11y patterns to Copilot CLI;
