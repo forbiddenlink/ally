@@ -20,7 +20,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ### Prerequisites
 
-- Node.js 18+ (18.x, 20.x, or 22.x)
+- Node.js >= 20.17 (20.x or 22.x)
 - pnpm (see `packageManager` in package.json)
 - Git
 

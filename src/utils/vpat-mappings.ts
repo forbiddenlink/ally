@@ -30,7 +30,7 @@ export interface ConformanceResult {
 
 /**
  * WCAG 2.2 Level A and AA Success Criteria mapped to axe-core rules
- * Based on WCAG_COVERAGE.md analysis
+ * Based on docs/WCAG_COVERAGE.md analysis
  */
 export const WCAG_CRITERIA: WcagCriterion[] = [
   // 1. Perceivable

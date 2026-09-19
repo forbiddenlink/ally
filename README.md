@@ -6,7 +6,7 @@
 [![CI](https://github.com/forbiddenlink/ally/actions/workflows/ci.yml/badge.svg)](https://github.com/forbiddenlink/ally/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/forbiddenlink/ally/branch/main/graph/badge.svg)](https://codecov.io/gh/forbiddenlink/ally)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20.17-brightgreen)](https://nodejs.org/)
 ![Accessibility](https://img.shields.io/badge/a11y-first-blue)
 
 ---
@@ -92,7 +92,7 @@ ally scan-storybook      # Scan Storybook components
 ally tree <url>          # View accessibility tree
 
 # Fixing & Learning
-ally fix                 # Interactive fix approval (35+ patterns)
+ally fix                 # Interactive fix approval (34 patterns)
 ally explain             # WCAG explanations + Copilot integration
 ally learn <violation>   # Educational deep-dive on violations
 ally triage              # Prioritize violations interactively
@@ -332,7 +332,7 @@ ally explain -l 5            # Limit to 5 issues
 
 ### `ally fix`
 
-Applies accessibility fixes using 35+ pattern-based transformations. Optionally integrates with GitHub Copilot CLI for complex fixes.
+Applies accessibility fixes using 34 pattern-based transformations. Optionally integrates with GitHub Copilot CLI for complex fixes.
 
 ```bash
 ally fix                     # Interactive (approve each fix)
@@ -343,7 +343,7 @@ ally fix -s serious          # Only fix serious+ issues
 
 **Features:**
 
-- 35+ automated fix patterns (image-alt, button-name, ARIA, etc.)
+- 34 automated fix patterns (image-alt, button-name, ARIA, etc.)
 - Shows diff before applying
 - Approve/reject each change
 - Tracks fix history for consistency
@@ -400,7 +400,7 @@ ally watch ./src --fix-on-save --verbose # Show all fixes applied
 ```
 
 **`--fix-on-save` Options:**
-- Applies **35+ fix patterns** automatically
+- Applies **34 fix patterns** automatically
 - Only fixes with **\u226590% confidence** (safe defaults)
 - Shows **diff** of each auto-fix in terminal
 - Tracks **stats** (files changed, fixes applied)
@@ -665,7 +665,7 @@ Ally includes a custom MCP server that provides project-specific context to Copi
 | **Business Context** | ✅ | ❌ | ❌ | ❌ |
 | **User Impact %** | ✅ | ❌ | ❌ | ❌ |
 | Scan | ✅ | ✅ | ✅ | ✅ |
-| AI Fixes (35+ patterns) | ✅ | ❌ | ❌ | ❌ |
+| AI Fixes (34 patterns) | ✅ | ❌ | ❌ | ❌ |
 | MCP Integration | ✅ | ❌ | ❌ | ❌ |
 | Watch Mode | ✅ | ❌ | ❌ | ❌ |
 | SARIF/JUnit/CSV Output | ✅ | ❌ | ✅ | ❌ |
@@ -705,13 +705,18 @@ Use ally in your CI/CD pipeline with our official GitHub Action:
 
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
-| `path` | string | `.` | Directory or URL to scan |
+| `path` | string | `.` | Path to scan |
 | `threshold` | number | 0 | Max violations before failure |
-| `fail-on` | string | `critical` | Violation levels: `critical,serious,moderate,minor` |
-| `max-files` | number | 0 | Limit scan to first N files (Quick Win) |
+| `url` | string | (none) | URL to scan instead of files |
+| `output` | string | `.ally` | Output directory for reports |
+| `max-files` | number | (none) | Limit scan to first N files (Quick Win) |
 | `baseline` | boolean | false | Save as baseline for regression tracking (Quick Win) |
 | `compare-baseline` | boolean | false | Compare against saved baseline (Quick Win) |
 | `fail-on-regression` | boolean | false | Fail if accessibility regresses (Quick Win) |
+
+`threshold` is a raw violation count. Severity-based filtering
+(`ally scan --fail-on critical`) is a CLI-only flag; the Action does not currently
+expose it as an input.
 
 **Output Reference:**
 
@@ -719,6 +724,7 @@ Use ally in your CI/CD pipeline with our official GitHub Action:
 |--------|------|-------------|
 | `score` | number | Overall accessibility score (0-100) |
 | `violations` | number | Total accessibility violations found |
+| `report` | string | Path to the generated report |
 | `improved` | number | Files with improved accessibility (when comparing baseline) |
 | `regressed` | number | Files with regressed accessibility (when comparing baseline) |
 
@@ -899,7 +905,7 @@ ally scan . --compare-baseline --fail-on-regression
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 20.17+
 - GitHub Copilot CLI (optional, for AI-powered explain/fix)
 - Copilot subscription (Individual, Business, or Enterprise)
 
@@ -929,7 +935,7 @@ Yes! Use the `--standard` flag to specify which WCAG level (A, AA, AAA) and vers
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-For understanding the codebase structure, see [ARCHITECTURE.md](ARCHITECTURE.md).
+For understanding the codebase structure, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Security
 
