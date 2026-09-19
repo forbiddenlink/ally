@@ -8,7 +8,7 @@ ally combines axe-core accessibility scanning with AI-powered explanations and a
 
 - **src/commands/** - CLI command implementations (19 commands)
 - **src/utils/** - Core utilities (scanner, fix-patterns, impact-scores)
-- **mcp-server/** - MCP server providing 7 tools for Copilot context
+- **mcp-server/** - MCP server providing 9 tools for Copilot context
 - **test/** - Unit and E2E tests
 
 ## Accessibility-First Development
@@ -64,8 +64,8 @@ When suggesting fixes, use these tools to ensure consistency with the codebase.
 
 - Unit tests in `test/*.test.ts`
 - E2E tests in `test/e2e/*.test.ts`
-- Run: `npm test` (unit), `npm run test:e2e` (E2E)
-- Coverage: `npm run test:coverage`
+- Run: `pnpm test` (unit), `pnpm run test:e2e` (E2E)
+- Coverage: `pnpm run test:coverage`
 
 ## Common Tasks
 

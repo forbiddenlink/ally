@@ -30,7 +30,7 @@ ally/
 │       └── index.ts        # TypeScript interfaces
 ├── mcp-server/             # MCP server for Copilot integration
 │   └── src/
-│       └── index.ts        # 7 MCP tools
+│       └── index.ts        # 9 MCP tools
 ├── test/                   # Unit tests
 ├── test-fixtures/          # HTML fixtures for testing
 ├── benchmark/              # Performance benchmarks

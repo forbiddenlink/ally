@@ -74,7 +74,7 @@ The MCP server:
 
 ## Dependency Management
 
-- All dependencies are audited with `npm audit`
+- All dependencies are audited with `pnpm audit` (`pnpm run audit` / `pnpm run security`)
 - Automated security updates via Dependabot (if configured)
 - Regular dependency updates to maintain security posture
 

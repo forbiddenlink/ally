@@ -5,6 +5,7 @@ node_modules/
 dist/
 # Ally scan results
 .ally/
+/ACCESSIBILITY.md
 # OS files
 .DS_Store
 Thumbs.db

@@ -63,5 +63,10 @@ via `pnpm --filter ally-mcp-server build` or `pnpm run build:all`.
 
 ## Claude/Copilot-specific
 
-When asked for accessibility work in this repo, read
-`.cursor/skills/ally-a11y/SKILL.md` and use `ally` rather than re-deriving scan logic.
+When asked for accessibility work in this repo, use `ally` rather than re-deriving
+scan logic (there is also a personal, gitignored Cursor skill with the same
+guidance under .cursor/, not tracked in the repo). Scan first; do not invent WCAG
+failures. Sort fixes by impact (critical/serious before moderate/minor). For
+unrendered `.tsx`/`.jsx`/`.vue`/`.svelte`, either scan a running URL
+(`ally scan --url`) or apply only high-confidence source fixes - axe needs HTML.
+`watch --fix-on-save` applies confidence >= 0.9 only.

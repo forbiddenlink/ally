@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-      - uses: ally-ai/ally@v1
+      - uses: forbiddenlink/ally@v1
         with:
           path: ./src
 ```
@@ -35,7 +35,7 @@ jobs:
 
 1. **Create a baseline** on your main branch:
    ```yaml
-   - uses: ally-ai/ally@v1
+   - uses: forbiddenlink/ally@v1
      with:
        path: ./src
        baseline: true
@@ -43,7 +43,7 @@ jobs:
 
 2. **Enable regressions detection** on PRs (once baseline exists):
    ```yaml
-   - uses: ally-ai/ally@v1
+   - uses: forbiddenlink/ally@v1
      with:
        path: ./src
        compare-baseline: true
@@ -54,29 +54,32 @@ jobs:
 
 ### Simple Threshold Check
 
-Scan for violations and fail if any critical issues found:
+Scan for violations and fail if any are found:
 
 ```yaml
 - name: Accessibility Check
-  uses: ally-ai/ally@v1
+  uses: forbiddenlink/ally@v1
   with:
     path: ./src
     threshold: 0
-    fail-on: critical
 ```
 
 ### Ignore Violations Below Threshold
 
-Allow minor violations but fail on serious issues:
+Allow a fixed number of violations before failing:
 
 ```yaml
 - name: Accessibility Check
-  uses: ally-ai/ally@v1
+  uses: forbiddenlink/ally@v1
   with:
     path: ./src
     threshold: 10  # Allow up to 10 violations
-    fail-on: serious,critical
 ```
+
+`threshold` is a raw violation count, not a severity filter. The CLI's `ally scan
+--fail-on <severities>` flag exists for local/non-Action use, but the GitHub Action
+(`action.yml`) does not currently expose a severity-based input - only `threshold`,
+`baseline`, `compare-baseline`, and `fail-on-regression`.
 
 ## Quick Wins Features
 
@@ -86,7 +89,7 @@ Limit scanning to first N files for faster feedback on large projects:
 
 ```yaml
 - name: Quick Scan
-  uses: ally-ai/ally@v1
+  uses: forbiddenlink/ally@v1
   with:
     path: ./src
     max-files: 100  # Scan only first 100 files
@@ -112,7 +115,7 @@ Set the current scan as your accessibility baseline:
 ```yaml
 - name: Set Accessibility Baseline
   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  uses: ally-ai/ally@v1
+  uses: forbiddenlink/ally@v1
   with:
     path: ./src
     baseline: true
@@ -124,7 +127,7 @@ Compare current scan against the saved baseline:
 
 ```yaml
 - name: Check for Regressions
-  uses: ally-ai/ally@v1
+  uses: forbiddenlink/ally@v1
   id: regression
   with:
     path: ./src
@@ -144,7 +147,7 @@ Only fail if there are actual regressions (improvements don't block merge):
 ```yaml
 - name: Check Regressions
   id: check
-  uses: ally-ai/ally@v1
+  uses: forbiddenlink/ally@v1
   with:
     path: ./src
     compare-baseline: true
@@ -161,16 +164,15 @@ Use all Quick Wins together for comprehensive CI coverage:
 
 ```yaml
 - name: Quick Validation (First 100 files)
-  uses: ally-ai/ally@v1
+  uses: forbiddenlink/ally@v1
   with:
     path: ./src
     max-files: 100           # Fast feedback
-    threshold: 5             # Allow minor issues
-    fail-on: serious
+    threshold: 5             # Allow up to 5 violations
 
 - name: Regression Check (vs baseline)
   if: github.event_name == 'pull_request'
-  uses: ally-ai/ally@v1
+  uses: forbiddenlink/ally@v1
   with:
     path: ./src
     compare-baseline: true    # Compare to main branch baseline
@@ -178,7 +180,7 @@ Use all Quick Wins together for comprehensive CI coverage:
 
 - name: Full Scan (Only on merge)
   if: github.ref == 'refs/heads/main'
-  uses: ally-ai/ally@v1
+  uses: forbiddenlink/ally@v1
   with:
     path: ./src
     baseline: true             # Update baseline
@@ -202,7 +204,7 @@ jobs:
       
       - name: Scan & Check Regressions
         id: a11y
-        uses: ally-ai/ally@v1
+        uses: forbiddenlink/ally@v1
         with:
           path: ./src
           compare-baseline: true
@@ -240,12 +242,11 @@ jobs:
       - uses: actions/setup-node@v4
       
       - name: Quick Scan (First 200 files)
-        uses: ally-ai/ally@v1
+        uses: forbiddenlink/ally@v1
         with:
           path: ./src
           max-files: 200
           threshold: 10
-          fail-on: serious,critical
   
   full-scan:
     runs-on: ubuntu-latest
@@ -256,7 +257,7 @@ jobs:
       - uses: actions/setup-node@v4
       
       - name: Full Accessibility Scan
-        uses: ally-ai/ally@v1
+        uses: forbiddenlink/ally@v1
         with:
           path: ./src
           baseline: true  # Update baseline after full scan
@@ -282,7 +283,7 @@ jobs:
       - uses: actions/setup-node@v4
       
       - name: Scan Chunk ${{ matrix.chunk }}
-        uses: ally-ai/ally@v1
+        uses: forbiddenlink/ally@v1
         with:
           path: ./src
           max-files: 1000
@@ -293,7 +294,7 @@ jobs:
     needs: scan
     steps:
       - name: Set Full Baseline
-        uses: ally-ai/ally@v1
+        uses: forbiddenlink/ally@v1
         with:
           path: ./src
           baseline: true
@@ -320,7 +321,7 @@ jobs:
       
       - name: Quick Scan (Few Changes)
         if: steps.files.outputs.count < 20
-        uses: ally-ai/ally@v1
+        uses: forbiddenlink/ally@v1
         with:
           path: ./src
           max-files: 100
@@ -329,7 +330,7 @@ jobs:
       
       - name: Full Scan (Many Changes)
         if: steps.files.outputs.count >= 20
-        uses: ally-ai/ally@v1
+        uses: forbiddenlink/ally@v1
         with:
           path: ./src
           compare-baseline: true
