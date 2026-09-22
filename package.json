@@ -123,7 +123,7 @@
       "fast-uri": ">=2.4.4 <3",
       "ip-address": ">=10.3.1 <11",
       "js-yaml": ">=4.3.1 <5",
-      "puppeteer": "25.10.0"
+      "puppeteer": "25.11.0"
     }
   },
   "packageManager": "pnpm@10.34.5"
