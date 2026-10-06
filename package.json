@@ -87,7 +87,7 @@
     "ora": "^9.4.1",
     "pa11y": "^9.1.1",
     "puppeteer": "^25.10.0",
-    "simple-git": "^3.36.0"
+    "simple-git": "^4.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
