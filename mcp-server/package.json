@@ -14,7 +14,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "apca-w3": "^0.1.9",
-    "glob": "^13.0.6",
+    "glob": "^14.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
