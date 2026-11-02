@@ -93,7 +93,7 @@
     "@biomejs/biome": "2.6.3",
     "@types/cli-progress": "3.11.6",
     "@types/inquirer": "9.0.10",
-    "@types/node": "26.6.5",
+    "@types/node": "26.6.6",
     "@types/pa11y": "5.3.7",
     "c8": "12.0.0",
     "tsx": "4.23.15",
