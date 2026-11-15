@@ -70,13 +70,13 @@ export type FixPatternFn = (html: string, violation: Violation) => string | null
 /**
  * Confidence scores for each fix pattern (0.0 to 1.0)
  *
- * High confidence (0.9+): Simple attribute additions (alt, aria-label, lang)
+ * High confidence (0.9+): Mechanical changes that do not guess content semantics
  * Medium confidence (0.7-0.9): Structural changes, role assignments
  * Lower confidence (0.5-0.7): Complex fixes requiring context
  */
 export const FIX_CONFIDENCE: Record<string, number> = {
   // === IMAGE AND MEDIA ===
-  'image-alt': 0.95, // Simple, reliable - just adds alt attribute
+  'image-alt': 0.5, // Filename guesses need author review; not safe to auto-apply
   'image-redundant-alt': 0.85, // Usually correct but may need human review
 
   // === INTERACTIVE ELEMENTS ===
@@ -92,7 +92,7 @@ export const FIX_CONFIDENCE: Record<string, number> = {
   'form-field-multiple-labels': 0.5, // Just a comment, needs manual work
 
   // === DOCUMENT STRUCTURE ===
-  'html-has-lang': 0.99, // Trivial fix, very reliable
+  'html-has-lang': 0.5, // Default English is a guess; require author review
   'document-title': 0.9, // Simple addition but needs real title
   'meta-viewport': 0.95, // Regex replacement is reliable
 
