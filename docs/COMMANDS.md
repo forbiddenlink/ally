@@ -155,7 +155,7 @@ ally explain -l 5            # Limit to 5 issues
 
 ## `ally fix`
 
-Applies accessibility fixes using 34 pattern-based transformations. Optionally integrates with GitHub Copilot CLI for complex fixes.
+Applies accessibility fixes using 40 pattern-based transformations. Optionally integrates with GitHub Copilot CLI for complex fixes.
 
 ```bash
 ally fix                     # Interactive (approve each fix)
@@ -166,7 +166,7 @@ ally fix -s serious          # Only fix serious+ issues
 
 **Features:**
 
-- 34 automated fix patterns (image-alt, button-name, ARIA, etc.)
+- 40 automated fix patterns (image-alt, button-name, ARIA, etc.)
 - Shows diff before applying
 - Approve/reject each change
 - Tracks fix history for consistency
@@ -223,7 +223,7 @@ ally watch ./src --fix-on-save --verbose # Show all fixes applied
 ```
 
 **`--fix-on-save` Options:**
-- Applies **34 fix patterns** automatically
+- Applies **40 fix patterns** automatically
 - Only fixes with **\u226590% confidence** (safe defaults)
 - Shows **diff** of each auto-fix in terminal
 - Tracks **stats** (files changed, fixes applied)
