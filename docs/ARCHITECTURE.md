@@ -229,4 +229,4 @@ Key optimizations:
 4. Run linting: `pnpm run lint`
 5. Submit a pull request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines.
