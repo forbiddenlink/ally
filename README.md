@@ -1,17 +1,16 @@
 # ally
 
-> **The only accessibility CLI with real-time auto-fix and impact scoring.**
+Accessibility CLI that scans for WCAG issues with axe-core, scores each by impact, and applies pattern-based fixes. It also provides an MCP server.
 
 [![npm version](https://img.shields.io/npm/v/ally-a11y)](https://www.npmjs.com/package/ally-a11y)
 [![CI](https://github.com/forbiddenlink/ally/actions/workflows/ci.yml/badge.svg)](https://github.com/forbiddenlink/ally/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/forbiddenlink/ally/branch/main/graph/badge.svg)](https://codecov.io/gh/forbiddenlink/ally)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.17-brightgreen)](https://nodejs.org/)
-![Accessibility](https://img.shields.io/badge/a11y-first-blue)
 
 ---
 
-## Two features worth knowing
+## Key features
 
 **Real-time auto-fix.** `ally watch src/ --fix-on-save` applies fixes as you save, only when confidence is at least 90%.
 
@@ -63,7 +62,7 @@ ally scan-storybook      # Scan Storybook components
 ally tree <url>          # View accessibility tree
 
 # Fixing & learning
-ally fix                 # Interactive fix approval (34 patterns)
+ally fix                 # Interactive fix approval (40 patterns)
 ally explain             # WCAG explanations + Copilot integration
 ally learn <violation>   # Educational deep-dive on violations
 ally triage              # Prioritize violations interactively
@@ -123,5 +122,5 @@ MIT © Elizabeth Stein
 ## Acknowledgments
 
 - Built with [axe-core](https://github.com/dequelabs/axe-core)
-- Powered by [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli)
-- Uses [Puppeteer](https://pptr.dev/) and [Playwright](https://playwright.dev/) for browser automation
+- Optional AI explanations through [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli)
+- Uses [Puppeteer](https://pptr.dev/) for browser automation, with optional [Playwright](https://playwright.dev/) support for Firefox and WebKit
