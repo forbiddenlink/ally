@@ -139,16 +139,16 @@ describe('fix patterns', () => {
   })
 
   describe('getFixConfidence', () => {
-    it('should return high confidence for image-alt', () => {
+    it('should return review-only (low) confidence for image-alt', () => {
       const confidence = getFixConfidence('image-alt')
       assert.ok(confidence, 'Should return confidence value')
-      assert.ok(confidence >= 0.8, 'Confidence should be high (>= 0.8)')
+      assert.ok(confidence < 0.7, 'Filename-guessed alt text should be low confidence (< 0.7)')
     })
 
-    it('should return high confidence for html-has-lang', () => {
+    it('should return review-only (low) confidence for html-has-lang', () => {
       const confidence = getFixConfidence('html-has-lang')
       assert.ok(confidence, 'Should return confidence value')
-      assert.ok(confidence >= 0.9, 'Confidence should be very high (>= 0.9)')
+      assert.ok(confidence < 0.7, 'Guessed default language should be low confidence (< 0.7)')
     })
 
     it('should return null for unknown violations', () => {
