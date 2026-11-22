@@ -1,2 +1,6 @@
+# Wait one week (in minutes) before resolving newly published packages, so a
+# compromised release (e.g. the Shai-Hulud npm worm) is pulled before it reaches
+# installs in CI or Vercel.
+minimumReleaseAge: 10080
 packages:
   - mcp-server
