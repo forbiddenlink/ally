@@ -29,6 +29,15 @@ export interface AltTextOptions {
 
 const DEFAULT_MAX_LENGTH = 125 // Recommended alt text length
 
+// gpt-6-luna: reasoning off (required for non-default temperature and small token budgets),
+// and max_completion_tokens (max_tokens is rejected)
+const OPENAI_ALT_TEXT_PARAMS = {
+  model: 'gpt-6-luna',
+  reasoning_effort: 'none',
+  max_completion_tokens: 100,
+  temperature: 0.3, // Low temperature for consistent results
+} as const
+
 /**
  * Check if OpenAI API is available
  */
@@ -123,7 +132,7 @@ Return ONLY the alt text, nothing else.`
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini', // Use mini for cost efficiency, sufficient for alt text
+      ...OPENAI_ALT_TEXT_PARAMS,
       messages: [
         {
           role: 'user',
@@ -139,8 +148,6 @@ Return ONLY the alt text, nothing else.`
           ],
         },
       ],
-      max_tokens: 100,
-      temperature: 0.3, // Low temperature for consistent results
     }),
   })
 
@@ -207,7 +214,7 @@ Return ONLY the alt text, nothing else.`
         Authorization: `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        ...OPENAI_ALT_TEXT_PARAMS,
         messages: [
           {
             role: 'user',
@@ -223,8 +230,6 @@ Return ONLY the alt text, nothing else.`
             ],
           },
         ],
-        max_tokens: 100,
-        temperature: 0.3,
       }),
     })
 
